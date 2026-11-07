@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mosty – konstruktor stalowych mostów</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header id="hud">
+    <div class="hud-left">
+      <button id="btn-user" class="btn btn-user" title="Zmień gracza">👤 <span id="user-name"></span></button>
+      <button id="btn-menu" class="btn" title="Wybór planszy (M)">☰ Plansze</button>
+      <div class="level-title"><span id="level-num">1</span>. <span id="level-name">—</span></div>
+    </div>
+
+    <div class="tools" id="tools">
+      <button class="tool" data-tool="road"  title="Jezdnia (1)"><i class="sw sw-road"></i>Jezdnia<small id="info-road"></small></button>
+      <button class="tool" data-tool="steel" title="Belka stalowa (2)"><i class="sw sw-steel"></i>Belka<small id="info-steel"></small></button>
+      <button class="tool" data-tool="cable" title="Lina stalowa (3)"><i class="sw sw-cable"></i>Lina<small id="info-cable"></small></button>
+      <button class="tool" data-tool="delete" title="Usuń element (4 / prawy przycisk)"><i class="sw sw-del"></i>Usuń</button>
+      <button class="tool hidden" id="tool-charge" data-tool="charge" title="Dynamit – kliknij belkę lub linę (5)"><i class="sw sw-charge"></i>Dynamit<small id="info-charge"></small></button>
+    </div>
+
+    <div class="hud-right">
+      <div class="budget" id="budget"><span id="cost">0</span> / <span id="budget-max">0</span> zł</div>
+      <button id="btn-undo" class="btn" title="Cofnij (Ctrl+Z)">↶</button>
+      <button id="btn-clear" class="btn" title="Wyczyść most">✕</button>
+      <button id="btn-detonate" class="btn btn-detonate hidden" title="Zdetonuj ładunki (D)">💥 Detonuj</button>
+      <button id="btn-test" class="btn btn-primary" title="Testuj most (Spacja)">▶ Testuj</button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <canvas id="game"></canvas>
+    <div id="hint" class="hint"></div>
+    <div id="toast" class="toast"></div>
+    <div id="legend" class="legend hidden">
+      <span>Naprężenie:</span><i class="grad"></i><span>0%</span><span>100%</span>
+    </div>
+  </main>
+
+  <div id="overlay" class="overlay hidden">
+    <div class="panel" id="panel"></div>
+  </div>
+
+  <script src="js/budgets.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/physics.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
