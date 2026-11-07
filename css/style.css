@@ -211,7 +211,7 @@ html, body {
 .start-title { text-align: center; margin-bottom: 18px; }
 .start-title h1 { font-size: 40px; letter-spacing: 1px; }
 .start-title p { margin: 4px 0 0; }
-.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
 .mode-card {
   font: inherit;
   color: var(--text);
@@ -324,3 +324,13 @@ body.testing #tools { display: none; }
 .btn-raise:hover { background: #ffd84a; }
 body.drawbridge #level-num { color: #f0c419; }
 .mode-drawbridge { background: linear-gradient(160deg, #1d4a5a, #1d2c3c 60%); }
+
+/* ---------- Skocznia ---------- */
+body.jump #level-num { color: #f39c4a; }
+.mode-jump { background: linear-gradient(160deg, #5a3520, #1d2c3c 60%); }
+.star-list { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; gap: 4px; }
+.star-list li { color: var(--muted); }
+.star-list li.ok { color: var(--text); }
+.star-list li.ok::first-letter { color: var(--accent); }
+
+.sw-counter { background: #9aa0a6; height: 10px; border: 1px solid #4d5156; }

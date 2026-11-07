@@ -22,6 +22,7 @@ Otwórz `index.html` w przeglądarce. Nie trzeba niczego instalować ani budowa�
 | Dynamit (wersja militarna) | `5`, potem kliknij belkę lub linę |
 | Detonacja (w trakcie testu) | `D` albo przycisk „Detonuj” |
 | Podnieś / opuść most zwodzony (w trakcie testu) | `P` albo przycisk „Podnieś most” |
+| Przeciwwaga (mosty zwodzone) | `6` |
 | Menu plansz | `M` |
 
 ## Gracze i tabela wyników
@@ -53,15 +54,22 @@ zanim przejedzie wróg. Na każdej planszy jest inna liczba ładunków dynamitu;
 na belki i liny (nie na jezdnię). Misja jest zaliczona, gdy wszyscy sojusznicy dojadą do flagi,
 a żaden wróg nie przejedzie – wróg może wpaść do przepaści razem z mostem albo zatrzymać się przed wyrwą.
 
-**Zwodzona** – 45 plansz w pięciu rozdziałach: **Pierwsze skrzydła**, **Port rzeczny**, **Wielkie statki**,
-**Miasto nad rzeką** i **Wielki port**. Statki: jacht, barka, holownik, prom, statek pasażerski, żaglowiec i kontenerowiec.
-Na nabrzeżu jest zawias z napędem (żółte koło zębate) – z jednej albo z obu stron kanału. Skrzydło mostu
-buduje się tylko na zawiasie i nie łączy z drugim brzegiem. W teście najpierw przejeżdżają pojazdy, potem
-nadpływa statek: trzeba podnieść most (przycisk lub klawisz `P`), a statek musi zmieścić się między
-skrzydłami – jego obrys widać w trybie budowy. Po przepłynięciu statku trzeba most opuścić: na każdej
-planszy jedzie jeszcze jeden pojazd, a przy każdym teście losowane jest, czy nadjedzie z lewej, czy z prawej
-strony – most musi więc działać w obu kierunkach. Pojazd czeka przed mostem, aż ten zostanie całkowicie
-opuszczony; jeśli most nie opadnie w ciągu 20 sekund, plansza jest przegrana.
+**Zwodzona** – 45 plansz w pięciu rozdziałach: **Pierwsze skrzydła**, **Przeciwwagi**, **Pylony i liny**,
+**Filary i skarpy** oraz **Wielki port**. Na nabrzeżu jest zawias z napędem (żółte koło zębate) – z jednej albo
+z obu stron kanału. Skrzydło buduje się tylko na zawiasie i nie łączy z drugim brzegiem. W teście najpierw
+przejeżdżają pojazdy, potem nadpływa statek: trzeba podnieść most (klawisz `P`), a statek musi zmieścić się
+między skrzydłami (jego obrys widać w trybie budowy). Po statku jedzie jeszcze jeden pojazd – losowo z lewej
+albo z prawej – więc most trzeba opuścić. Kolejne rozdziały wprowadzają:
+- **słaby napęd i studnię przeciwwagi** – skrzydło trzeba przedłużyć w ogon nad studnią i obciążyć blokami
+  „Przeciwwaga” (klawisz `6`); skrzydło z ogonem musi być jedną sztywną kratownicą,
+- **pylony** – liny z pylonu podtrzymują długie skrzydło, a przy podnoszeniu same się luzują,
+- **filary w nurcie** – zawias stoi na filarze, a od brzegu trzeba zbudować nieruchomy most dojazdowy,
+- **brzegi na różnych wysokościach** – skrzydła muszą być pochylone.
+
+**Skocznia** – 15 plansz w trzech rozdziałach. Rozpędzony motocyklista wjeżdża na zbudowaną rampę i przeskakuje
+przepaść. Na każdej planszy jest tylko kilka kotew w określonych miejscach: rampę trzeba czasem wysunąć nad
+przepaść z kotew na ścianie, przekryć rów na rozbiegu albo podeprzeć rampę lądowania na skale w przepaści.
+Gwiazdki: ★ za przeskok, ★ za lądowanie bez wywrotki, ★ za koszt do 75% budżetu.
 
 We wszystkich wersjach kolejna plansza odblokowuje się po przejściu poprzedniej.
 Gwiazdki: 1 za przejście, 2 za koszt do 85% budżetu, 3 za koszt do 70% budżetu.
@@ -78,7 +86,8 @@ Gwiazdki: 1 za przejście, 2 za koszt do 85% budżetu, 3 za koszt do 70% budżet
 
 ## Dodawanie lub zmiana planszy
 
-1. Dopisz lub zmień wpis w tablicy `SPECS` (cywilne), `MIL_SPECS` (militarne) albo `DRAW_SPECS` (zwodzone) w `js/levels.js`.
+1. Dopisz lub zmień wpis w tablicy `SPECS` (cywilne), `MIL_SPECS` (militarne), `DRAW_SPECS` (zwodzone)
+   albo `JUMP_SPECS` (skocznia) w `js/levels.js`.
 2. Uruchom `node tools/budzety.js` – narzędzie sprawdzi, czy każdą planszę da się przejść,
-   i zapisze nowe budżety do `js/budgets.js`. `node tools/budzety.js 12 m3 z5` sprawdza tylko
-   planszę cywilną 12, militarną 3 i zwodzoną 5.
+   i zapisze nowe budżety do `js/budgets.js`. `node tools/budzety.js 12 m3 z5 s2` sprawdza tylko
+   wybrane plansze, a `ZAPISZ=1 node tools/budzety.js z5` dodatkowo dopisuje ich budżety.

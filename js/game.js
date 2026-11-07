@@ -7,17 +7,20 @@
   // Dwie wersje gry: każda ma własne plansze, rozdziały i zapis postępów
   const VARIANTS = {
     civil: {
-      name: 'Cywilna', levels: window.LEVELS, chapters: window.CHAPTERS, prefix: 'civil.',
+      name: 'Cywilna', title: 'Wersja cywilna', levels: window.LEVELS, chapters: window.CHAPTERS, prefix: 'civil.',
     },
     military: {
-      name: 'Militarna', levels: window.MIL_LEVELS, chapters: window.MIL_CHAPTERS, prefix: 'mil.',
+      name: 'Militarna', title: 'Wersja militarna', levels: window.MIL_LEVELS, chapters: window.MIL_CHAPTERS, prefix: 'mil.',
     },
     drawbridge: {
-      name: 'Zwodzona', levels: window.DRAW_LEVELS, chapters: window.DRAW_CHAPTERS, prefix: 'draw.',
+      name: 'Zwodzona', title: 'Mosty zwodzone', levels: window.DRAW_LEVELS, chapters: window.DRAW_CHAPTERS, prefix: 'draw.',
+    },
+    jump: {
+      name: 'Skocznia', title: 'Skocznia', levels: window.JUMP_LEVELS, chapters: window.JUMP_CHAPTERS, prefix: 'jump.',
     },
   };
   // litera w kodzie testowym (testc / testm / testz) → wersja gry
-  const CODE_VARIANT = { c: 'civil', m: 'military', z: 'drawbridge' };
+  const CODE_VARIANT = { c: 'civil', m: 'military', z: 'drawbridge', s: 'jump' };
 
   const $ = (id) => document.getElementById(id);
   const canvas = $('game');
@@ -229,7 +232,9 @@
     if (currentUser) store.set(userPrefix(currentUser.id) + 'variant', id);
     document.body.classList.toggle('military', id === 'military');
     document.body.classList.toggle('drawbridge', id === 'drawbridge');
+    document.body.classList.toggle('jump', id === 'jump');
     if (!military() && S.tool === 'charge') S.tool = 'road';
+    if (id !== 'drawbridge' && S.tool === 'counter') S.tool = 'road';
   }
 
   const designKey = (i) => ukey((S.testMode ? 'test.design.' : 'design.') + i);
@@ -262,12 +267,18 @@
   function setHint() {
     const lv = S.level;
     if (S.mode === 'build') {
-      if (lv.drawbridge) {
+      if (lv.jump) {
+        $('hint').innerHTML =
+          `<b>Cel:</b> zbuduj rampę, z której motocyklista (${Math.round(lv.motoSpeed * 3.6)} km/h) przeskoczy przepaść. ${lv.hint}<br>` +
+          `★ za przeskok · ★ za lądowanie bez wywrotki · ★ za koszt do 75% budżetu. Rampę opieraj na <b>kotwach w podłożu</b>.`;
+      } else if (lv.drawbridge) {
         const after = lv.spec.after || [];
         $('hint').innerHTML =
           `<b>Cel:</b> przepuść ${vehicleList(lv.spec.before)}, potem podnieś most, by przepłynął ${SHIPS[lv.ship].name.toLowerCase()}` +
           (after.length ? `, a na koniec opuść go dla: ${vehicleList(after)} – nadjedzie z lewej albo z prawej strony` : '') + `. ${lv.hint}<br>` +
-          `Skrzydło mocuj do <b>zawiasu z napędem</b> (żółte koło). Przerywany obrys pokazuje, ile miejsca potrzebuje statek.`;
+          `Skrzydło mocuj do <b>zawiasu z napędem</b> (żółte koło). Przerywany obrys pokazuje, ile miejsca potrzebuje statek.` +
+          (lv.torque < 600 ? ` <b>Napęd: ${lv.torque} kN·m</b> – bez przeciwwagi (klawisz 6) skrzydło się nie podniesie.` : '') +
+          (lv.pylons && lv.pylons.length ? ' Liny od <b>pylonu</b> luzują się przy podnoszeniu.' : '');
       } else if (lv.military) {
         $('hint').innerHTML =
           `<b>Misja:</b> przeprowadź sojuszników (${vehicleList(lv.spec.allies)}) do flagi, potem wysadź most, ` +
@@ -280,7 +291,7 @@
             : `<b>Cel:</b> przeprowadź pojazd (${VEHICLES[lv.vehicle].name.toLowerCase()}) na drugą stronę, do flagi. ${lv.hint}<br>`) +
           `Kliknij węzeł lub <b>czerwoną kotwę</b>, potem punkt siatki. Prawy przycisk – anuluj / usuń.`;
       }
-    } else if (!lv.military && !lv.drawbridge) {
+    } else if (!lv.military && !lv.drawbridge && !lv.jump) {
       $('hint').innerHTML = `<b>Test:</b> kolory pokazują naprężenie elementów. Spacja – powrót do budowy.`;
     } else {
       updateMissionStatus(true);
@@ -292,6 +303,7 @@
     const sim = S.sim;
     if (!sim) return;
     if (S.level.drawbridge) { updateDrawStatus(force); return; }
+    if (S.level.jump) { updateJumpStatus(force); return; }
     if (!S.level.military) return;
     const allies = sim.vehicles.filter(v => v.team === 'ally');
     const enemies = sim.vehicles.filter(v => v.team === 'enemy');
@@ -323,8 +335,26 @@
         ? ` · <b>Ostatni pojazd</b> ${last.dir > 0 ? 'z lewej' : 'z prawej'}: <span class="warn">czeka na opuszczenie mostu</span>`
         : ` · <b>Ostatni pojazd:</b> ${last.dir > 0 ? 'z lewej' : 'z prawej'}`;
     const html = `<b>Pojazdy:</b> ${crossed} / ${sim.vehicles.length} · <b>${ship.spec.name}:</b> ${shipState} · ` +
-      `<b>Most:</b> ${bridge} – klawisz P: ${sim.raiseTarget ? 'opuść' : 'podnieś'}${lastInfo}`;
+      `<b>Most:</b> ${bridge} – klawisz P: ${sim.raiseTarget ? 'opuść' : 'podnieś'}${lastInfo}` +
+      (moving ? ` · <b>Napęd:</b> ${sim.motorStall ? '<span class="warn">przeciążony – za mało lub za dużo przeciwwagi!</span>' : Math.round(Math.max(...sim.motors.map(m => m.load)) * 100) + '%'}` : '');
     if (force || html !== lastStatus) { $('hint').innerHTML = html; lastStatus = html; }
+  }
+
+  function updateJumpStatus(force) {
+    const v = S.sim.car;
+    if (v.state === 'waiting') return;
+    const speed = Math.hypot(v.w1.vx, v.w1.vy) * 3.6;
+    const jump = v.airborne ? Math.min(v.w1.x, v.w2.x) - v.takeoffX : v.jump;
+    const landing = v.crashed ? '<span class="warn">wywrotka!</span>'
+      : v.jump > 0 ? 'czyste' : v.airborne ? 'w locie…' : '—';
+    const html = `<b>Prędkość:</b> ${Math.round(speed)} km/h · <b>Skok:</b> ${Math.max(0, jump).toFixed(1)} m · <b>Lądowanie:</b> ${landing}`;
+    if (force || html !== lastStatus) { $('hint').innerHTML = html; lastStatus = html; }
+  }
+
+  // Gwiazdki: w skoczni ★ za przeskok, ★ za czyste lądowanie, ★ za koszt do 75% budżetu
+  function starsFor(r, cost, budget) {
+    if (S.level.jump) return 1 + (r.clean ? 1 : 0) + (cost <= budget * 0.75 ? 1 : 0);
+    return stars(cost, budget);
   }
 
   function toggleRaise() {
@@ -382,18 +412,28 @@
     const levels = LV();
     if (r.win) {
       const cost = totalCost();
-      const st = stars(cost, S.level.budget);
+      const st = starsFor(r, cost, S.level.budget);
       if (!S.testMode) {
         const p = progress();
         const best = p.best[S.li];
-        if (!best || cost < best.cost) p.best[S.li] = { cost, stars: st, date: Date.now() };
+        const better = !best || st > best.stars || (st === best.stars && cost < best.cost);
+        if (better) p.best[S.li] = { cost, stars: st, date: Date.now() };
         p.unlocked = Math.max(p.unlocked, Math.min(levels.length, S.li + 2));
         saveProgress();
       }
       const last = S.li === levels.length - 1;
       const costLine = `Koszt: <b>${cost.toLocaleString('pl-PL')} zł</b> z ${S.level.budget.toLocaleString('pl-PL')} zł.
         ${st < 3 ? `Trzy gwiazdki za koszt do ${Math.floor(S.level.budget * 0.7).toLocaleString('pl-PL')} zł.` : 'Wzorowa, oszczędna konstrukcja.'}`;
-      const body = S.level.drawbridge
+      const check = (ok, text) => `<li class="${ok ? 'ok' : 'no'}">${ok ? '★' : '☆'} ${text}</li>`;
+      const body = S.level.jump
+        ? `<h2>${r.clean ? 'Skok udany!' : 'Przeskoczył – ale z wywrotką'}</h2>
+           <div class="big-stars">${starsHtml(st)}</div>
+           <ul class="star-list">
+             ${check(true, `Przeskok: <b>${r.jump.toFixed(1)} m</b>`)}
+             ${check(r.clean, r.clean ? 'Lądowanie bez wywrotki' : r.cause === 'rider' ? 'Wywrotka – kierowca uderzył o ziemię' : 'Wywrotka – za twarde lądowanie')}
+             ${check(cost <= S.level.budget * 0.75, `Koszt ${cost.toLocaleString('pl-PL')} zł (★ do ${Math.floor(S.level.budget * 0.75).toLocaleString('pl-PL')} zł)`)}
+           </ul>`
+        : S.level.drawbridge
         ? `<h2>Statek przepłynął!</h2>
            <div class="big-stars">${starsHtml(st)}</div>
            <p>Wszystkie pojazdy przejechały, a ${sim.ship.spec.name.toLowerCase()} zmieścił się pod mostem.<br>${costLine}</p>`
@@ -414,6 +454,11 @@
         </div>`);
     } else {
       let tip = 'Spójrz, które elementy świecą na czerwono – to one były najbardziej przeciążone. Pamiętaj: trójkąty są sztywne, prostokąty się składają.';
+      if (S.level.jump) {
+        tip = r.reason === 'short'
+          ? 'Motocyklista nie doleciał. Zbuduj wyższą lub bardziej stromą rampę – albo rampę lądowania po drugiej stronie.'
+          : 'Spróbuj zmienić kąt wybicia. Zbyt stroma rampa daje wysoki, ale krótki skok; zbyt płaska – niski i krótki.';
+      }
       if (S.level.drawbridge) {
         if (r.reason === 'ship') tip = sim.raise < 0.5
           ? 'Most był opuszczony. Gdy statek nadpływa, naciśnij „Podnieś most” albo klawisz P.'
@@ -428,7 +473,7 @@
         else if (sim.detonated && sim.vehicles.some(v => v.team === 'ally' && v.fell)) tip = 'Wysadziłeś most za wcześnie albo nie wytrzymał przejazdu. Poczekaj, aż wszyscy sojusznicy zjadą z mostu.';
       }
       showPanel('result', `
-        <h2>${S.level.military ? 'Misja nieudana' : S.level.drawbridge ? 'Nie tym razem' : 'Most nie wytrzymał'}</h2>
+        <h2>${S.level.military ? 'Misja nieudana' : S.level.drawbridge || S.level.jump ? 'Nie tym razem' : 'Most nie wytrzymał'}</h2>
         <p>${r.msg} ${tip}</p>
         <div class="actions">
           <button class="btn" data-act="watch">Oglądaj dalej</button>
@@ -467,7 +512,7 @@
       const v = VARIANTS[id];
       return `<button class="mode-card mode-${id}" data-variant="${id}">
         <div class="mode-icon">${icon}</div>
-        <div class="mode-name">Wersja ${v.name.toLowerCase()}</div>
+        <div class="mode-name">${v.title}</div>
         <div class="mode-desc">${desc}</div>
         <div class="mode-meta"><span class="stars">★ ${starsOf(id)} / ${v.levels.length * 3}</span> · ${v.levels.length} plansz</div>
       </button>`;
@@ -482,6 +527,7 @@
         ${card('civil', '🌉', 'Buduj mosty nad przepaściami dla aut, ciężarówek i cystern. Zmieść się w budżecie i przeprowadź pojazd na drugą stronę.')}
         ${card('military', '🧨', 'Zbuduj przeprawę dla kolumny wojska. Gdy sojusznicy przejadą, wysadź most dynamitem, zanim przejedzie wróg.')}
         ${card('drawbridge', '⚓', 'Buduj mosty zwodzone z napędem z jednej lub obu stron. Przepuść pojazdy, podnieś most i zmieść statek pod spodem.')}
+        ${card('jump', '🏍️', 'Zbuduj rampę dla rozpędzonego motocyklisty. Przeskocz przepaść i wyląduj bez wywrotki – czasem z pomocą drugiej rampy.')}
       </div>`, true);
   }
 
@@ -598,7 +644,7 @@
       <div class="menu-head"><h1>🏆 Tabela wyników</h1></div>
       <div class="tabs">
         ${Object.entries(VARIANTS).map(([id, v]) =>
-          `<button class="tab${id === variant ? ' active' : ''}" data-score-variant="${id}">Wersja ${v.name.toLowerCase()}</button>`).join('')}
+          `<button class="tab${id === variant ? ' active' : ''}" data-score-variant="${id}">${v.title}</button>`).join('')}
       </div>
       <h3 class="section-title">Ranking graczy</h3>
       <p class="section-desc">Kolejność: gwiazdki, potem liczba zaliczonych plansz, potem niższy łączny koszt mostów.</p>
@@ -621,7 +667,9 @@
       const status = locked ? '🔒 zablokowana'
         : best ? starsHtml(best.stars) + ' ' + best.cost.toLocaleString('pl-PL') + ' zł'
         : 'budżet ' + lv.budget.toLocaleString('pl-PL') + ' zł';
-      const sub = lv.drawbridge
+      const sub = lv.jump
+        ? `przepaść ${lv.spec.gap} m · ${Math.round(lv.motoSpeed * 3.6)} km/h`
+        : lv.drawbridge
         ? `${SHIPS[lv.ship].name} · ${lv.spec.sides === 2 ? 'dwa skrzydła' : 'jedno skrzydło'}`
         : lv.military
         ? `${vehicleList(lv.spec.allies)} · 🧨 ${lv.charges}`
@@ -644,7 +692,7 @@
     }).join('');
     showPanel('menu', `
       <div class="menu-head">
-        <h1>Mosty <small>· wersja ${V().name.toLowerCase()}</small></h1>
+        <h1>Mosty <small>· ${V().title.toLowerCase()}</small></h1>
         <span class="stars">★ ${starsOf(S.variant)} / ${levels.length * 3}</span>
       </div>
       ${userBar()}
@@ -719,6 +767,7 @@
     $('tools').classList.toggle('disabled', S.mode === 'test');
     document.body.classList.toggle('testing', S.mode === 'test');
     $('tool-charge').classList.toggle('hidden', !military());
+    $('tool-counter').classList.toggle('hidden', S.variant !== 'drawbridge');
     if (military()) $('info-charge').textContent = `${chargeCount()} / ${S.level.charges}`;
     const t = $('btn-test');
     t.textContent = S.mode === 'test' ? '■ Stop' : '▶ Testuj';
@@ -735,7 +784,7 @@
     $('btn-clear').classList.toggle('hidden', S.mode === 'test');
     $('legend').classList.toggle('hidden', S.mode !== 'test');
   }
-  for (const t of ['road', 'steel', 'cable']) {
+  for (const t of ['road', 'steel', 'cable', 'counter']) {
     const m = MATERIALS[t];
     $('info-' + t).textContent = `${m.cost} zł/m · ≤${m.maxLen} m`;
     const btn = document.querySelector(`.tool[data-tool="${t}"]`);
@@ -755,6 +804,7 @@
   function setTool(t) {
     if (S.mode !== 'build') return;
     if (t === 'charge' && !military()) return;
+    if (t === 'counter' && S.variant !== 'drawbridge') return;
     S.tool = t;
     if (t === 'delete' || t === 'charge') S.pending = null;
     updateHud();
@@ -835,6 +885,7 @@
       case '3': setTool('cable'); break;
       case '4': case 'Delete': setTool('delete'); break;
       case '5': setTool('charge'); break;
+      case '6': setTool('counter'); break;
       case 'd': case 'D': detonate(); break;
       case 'p': case 'P': toggleRaise(); break;
       case ' ': e.preventDefault(); S.mode === 'test' ? stopTest() : startTest(); break;
@@ -855,26 +906,26 @@
     if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return false;
     cheatBuf = (cheatBuf + e.key.toLowerCase()).slice(-12);
     clearTimeout(cheatTimer);
-    const m = cheatBuf.match(/test([cmz])(\d{1,2})$/);
+    const m = cheatBuf.match(/test([cmzs])(\d{1,2})$/);
     if (m) {
       // chwila na wpisanie drugiej cyfry
       cheatTimer = setTimeout(() => { cheatBuf = ''; enterTestMode(CODE_VARIANT[m[1]], +m[2]); }, 700);
       return true;
     }
-    return /test[cmz]$/.test(cheatBuf); // połknij „c” / „m” / „z”, żeby nie otworzyć menu
+    return /test[cmzs]$/.test(cheatBuf); // połknij literę wersji, żeby nie otworzyć menu
   }
 
   function enterTestMode(variant, n) {
     const levels = VARIANTS[variant].levels;
     if (n < 1 || n > levels.length) {
-      toast(`Wersja ${VARIANTS[variant].name.toLowerCase()} ma plansze 1–${levels.length}`);
+      toast(`${VARIANTS[variant].title} ma plansze 1–${levels.length}`);
       return;
     }
     if (variant !== S.variant) setVariant(variant);
     S.testMode = true;
     hideOverlay();
     loadLevel(n - 1);
-    toast(`🧪 Tryb testowy: plansza ${n} (wersja ${VARIANTS[variant].name.toLowerCase()})`, true);
+    toast(`🧪 Tryb testowy: plansza ${n} (${VARIANTS[variant].title.toLowerCase()})`, true);
   }
 
   function exitTestMode() {
@@ -913,6 +964,7 @@
     civil:    { sky: ['#7fb8e6', '#d6ecf7'], rock: '#7a6551', rockLine: '#4b3b2e', grass: '#5d9a3c', hills: 'rgba(90,120,150,0.25)' },
     military: { sky: ['#8c9aa3', '#d8d0b4'], rock: '#6e6650', rockLine: '#443e2f', grass: '#6b7d3a', hills: 'rgba(80,90,80,0.3)' },
     drawbridge: { sky: ['#8fc3ea', '#e3f1f9'], rock: '#8a8f96', rockLine: '#565b62', grass: '#9aa0a8', hills: 'rgba(90,120,150,0.22)' },
+    jump: { sky: ['#f3a96b', '#fde6c8'], rock: '#9a6a46', rockLine: '#5e3e28', grass: '#7aa344', hills: 'rgba(150,90,60,0.25)' },
   };
   const theme = () => THEME[S.variant];
 
@@ -1092,6 +1144,13 @@
       ctx.strokeStyle = '#5a2412'; ctx.lineWidth = s * 0.24; ctx.stroke();
       ctx.strokeStyle = stress != null ? stressColor(stress) : '#c8562e'; ctx.lineWidth = s * 0.17; ctx.stroke();
       ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = Math.max(1, s * 0.04); ctx.stroke();
+    } else if (type === 'counter') {
+      beamPath(ax, ay, bx, by);
+      ctx.lineCap = 'butt';
+      ctx.strokeStyle = '#4d5156'; ctx.lineWidth = s * 0.62; ctx.stroke();
+      ctx.strokeStyle = stress != null ? stressColor(stress) : '#9aa0a6'; ctx.lineWidth = s * 0.5; ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = Math.max(1, s * 0.05);
+      ctx.setLineDash([s * 0.08, s * 0.25]); ctx.stroke(); ctx.setLineDash([]);
     } else if (type === 'cable') {
       beamPath(ax, ay, bx, by);
       ctx.strokeStyle = stress != null ? stressColor(stress) : (S.mode === 'build' ? '#d0d7de' : '#2b2d31');
@@ -1206,6 +1265,19 @@
     ctx.stroke();
   }
 
+  function drawPylons() {
+    const s = S.view.s;
+    for (const py of S.level.pylons || []) {
+      const [x0, y0] = W2S(py.x - 0.3, py.y1 + 0.3), [x1, y1] = W2S(py.x + 0.3, py.y0);
+      ctx.fillStyle = S.mode === 'build' ? '#4a5866' : '#a7adb3';
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      for (let y = py.y0 + 1; y < py.y1; y += 1.5) { const [, sy] = W2S(0, y); ctx.fillRect(x0, sy, x1 - x0, Math.max(1, s * 0.05)); }
+    }
+  }
+
   function drawFlag(fx) {
     const x = fx != null ? fx : S.level.finish;
     const gy = groundY(x);
@@ -1267,7 +1339,25 @@
       }
     };
 
-    if (style === 'tank') {
+    if (style === 'moto') {
+      const lw = Math.max(1.5, s * 0.07);
+      wheel(0, rot1, r);
+      wheel(wb, rot2, r);
+      line([[0, 0], [0.55, 0.45], [wb - 0.3, 0.55], [wb, 0]], '#2b2d31', lw * 1.3);
+      poly([[0.45, 0.1], [0.85, 0.1], [0.9, 0.42], [0.45, 0.42]], '#3b3f45');
+      poly([[0.3, 0.5], [1.05, 0.52], [1.2, 0.7], [0.75, 0.74], [0.3, 0.66]], '#d63c3c');
+      // kierowca
+      line([[0.6, 0.72], [0.82, 0.32], [1.0, 0.25]], '#24324a', lw * 1.6);
+      line([[0.6, 0.72], [0.98, 1.3]], '#2f6fb3', lw * 2.4);
+      line([[0.98, 1.3], [1.2, 1.0], [wb - 0.25, 0.9]], '#2f6fb3', lw * 1.4);
+      const [hx, hy] = P(1.08, 1.55);
+      ctx.beginPath(); ctx.arc(hx, hy, s * 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#f0c419'; ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+      const [vx1, vy1] = P(1.14, 1.5), [vx2, vy2] = P(1.27, 1.52);
+      ctx.strokeStyle = '#1b1d20'; ctx.lineWidth = Math.max(2, s * 0.07);
+      ctx.beginPath(); ctx.moveTo(vx1, vy1); ctx.lineTo(vx2, vy2); ctx.stroke();
+    } else if (style === 'tank') {
       // gąsienica
       const tr = [];
       for (let a = 0; a <= 12; a++) { const t = Math.PI / 2 + (a / 12) * Math.PI; tr.push([Math.cos(t) * r, Math.sin(t) * r]); }
@@ -1398,6 +1488,7 @@
     if (S.level.drawbridge) drawShip(S.level.shipX, S.level.ship, 1, 1, true);
     for (const b of S.beams) if (b.type === 'cable') drawBeam(b.a[0], b.a[1], b.b[0], b.b[1], b.type, null);
     for (const b of S.beams) if (b.type === 'steel') drawBeam(b.a[0], b.a[1], b.b[0], b.b[1], b.type, null);
+    for (const b of S.beams) if (b.type === 'counter') drawBeam(b.a[0], b.a[1], b.b[0], b.b[1], b.type, null);
     for (const b of S.beams) if (b.type === 'road') drawBeam(b.a[0], b.a[1], b.b[0], b.b[1], b.type, null);
 
     // podświetlenie elementu pod kursorem (usuwanie / dynamit)
@@ -1490,7 +1581,7 @@
         ctx.strokeStyle = '#6b7078'; ctx.lineWidth = S.view.s * 0.16; ctx.lineCap = 'round'; ctx.stroke(); ctx.lineCap = 'butt';
       }
     }
-    const order = { cable: 0, steel: 1, road: 2 };
+    const order = { cable: 0, steel: 1, counter: 2, road: 3 };
     const list = sim.constraints.filter(c => c.type !== 'car' && !c.broken).sort((a, b) => order[a.type] - order[b.type]);
     for (const c of list) {
       const a = P[c.a], b = P[c.b];
@@ -1524,6 +1615,7 @@
         ctx.fillRect(0, 0, w, h);
         drawGrid(w, h);
       }
+      drawPylons();
       drawFlag();
       if (S.level.drawbridge && S.sim && S.sim.vehicles.some(v => v.dir < 0)) drawFlag(S.level.finishL);
       if (S.mode === 'build') drawBuild();
@@ -1562,7 +1654,7 @@
   showStart();
   // Link z kodem testowym, np. index.html#testm5 albo index.html?testc12
   function testFromUrl() {
-    const m = (location.hash + location.search).toLowerCase().match(/test([cmz])(\d{1,2})/);
+    const m = (location.hash + location.search).toLowerCase().match(/test([cmzs])(\d{1,2})/);
     if (m) enterTestMode(CODE_VARIANT[m[1]], +m[2]);
   }
   testFromUrl();

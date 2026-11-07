@@ -305,21 +305,24 @@
   ];
 
   // ---------- Wersja z mostami zwodzonymi ----------
-  // sides  – 1: skrzydło podnoszone z lewego brzegu, 2: dwa skrzydła z obu brzegów
-  // gap    – szerokość kanału (przy dwóch skrzydłach nieparzysta: między końcami skrzydeł zostaje 1 m)
-  // yB     – wysokość nabrzeży (domyślnie 6)
-  // ship   – statek, który musi przepłynąć (Physics.SHIPS)
-  // before – pojazdy jadące przed statkiem, after – pojazdy jadące po nim (most trzeba opuścić)
+  // sides    – 1: skrzydło z lewego zawiasu, 2: dwa skrzydła spotykające się na środku
+  // gap      – odległość między zawiasami (przy dwóch skrzydłach nieparzysta: między końcami zostaje 1 m)
+  // yL, yR   – wysokość lewego i prawego nabrzeża (domyślnie yB lub 6)
+  // ship     – statek (Physics.SHIPS); before / after – pojazdy przed statkiem i jeden po nim
+  // torque   – moment napędu zawiasu [kN·m] (domyślnie 600); słaby napęd wymaga przeciwwagi
+  // pit      – studnia przeciwwagi za zawiasem na brzegu: w – szerokość, d – głębokość
+  // pylon    – pylon za zawiasem z kotwą na szczycie (do lin): dx – odległość od zawiasu, h – wysokość
+  // approach – długość przęsła dojazdowego do filaru, na którym stoi zawias (0 – zawias na brzegu)
   const DRAW_CHAPTERS = [
-    { name: 'Pierwsze skrzydła', count: 5, desc: 'Przepuść auto, podnieś most, przepuść statek.' },
-    { name: 'Port rzeczny', count: 5, desc: 'Dwa skrzydła, większe statki i ruch w obie strony.' },
-    { name: 'Wielkie statki', count: 5, desc: 'Żaglowce i kontenerowce. Skrzydła muszą być mocne i smukłe.' },
-    { name: 'Miasto nad rzeką', count: 15, desc: 'Holowniki, promy i miejski ruch. Kolumny pojazdów przed każdym statkiem.' },
-    { name: 'Wielki port', count: 15, desc: 'Najszersze kanały, najcięższe pojazdy i największe statki w grze.' },
+    { name: 'Pierwsze skrzydła', count: 5, desc: 'Przepuść pojazd, podnieś most dla statku i opuść go dla kolejnego pojazdu.' },
+    { name: 'Przeciwwagi', count: 5, desc: 'Słabe napędy. Zbuduj ogon skrzydła nad studnią i obciąż go przeciwwagą.' },
+    { name: 'Pylony i liny', count: 5, desc: 'Ciężkie pojazdy na długich skrzydłach. Liny z pylonu luzują się przy podnoszeniu.' },
+    { name: 'Filary i skarpy', count: 15, desc: 'Zawiasy na filarach w nurcie, mosty dojazdowe i brzegi na różnych wysokościach.' },
+    { name: 'Wielki port', count: 15, desc: 'Wszystko naraz: przeciwwagi, pylony, filary i najcięższe statki.' },
   ];
 
   const DRAW_SPECS = [
-    // ---------- Rozdział 1 ----------
+    // ---------- Rozdział 1: Pierwsze skrzydła ----------
     { name: 'Kładka nad kanałem', sides: 1, gap: 6, ship: 'jacht', before: ['car'], after: ['car'],
       hint: 'Skrzydło mocuj tylko do zawiasu z napędem. Gdy auto przejedzie, podnieś most.' },
     { name: 'Przystań', sides: 1, gap: 7, ship: 'barka', before: ['car'], after: ['car'],
@@ -329,129 +332,185 @@
     { name: 'Barka węglowa', sides: 2, gap: 11, ship: 'barka', before: ['van'], after: ['van'],
       hint: 'Dostawczak jest cięższy – skrzydła potrzebują głębszej kratownicy.' },
     { name: 'Tam i z powrotem', sides: 1, gap: 7, ship: 'jacht', before: ['car'], after: ['car'],
-      hint: 'Po statku jedzie drugie auto. Pamiętaj, by opuścić most.' },
+      hint: 'Po statku jedzie drugie auto – z lewej albo z prawej. Pamiętaj, by opuścić most.' },
 
-    // ---------- Rozdział 2 ----------
-    { name: 'Port rzeczny', sides: 2, gap: 13, ship: 'statek', before: ['car', 'car'], after: ['car'],
-      hint: 'Statek pasażerski jest szeroki. Zostaw mu miejsce między skrzydłami.' },
-    { name: 'Wąski kanał', sides: 1, gap: 8, yB: 7, ship: 'zaglowiec', before: ['van'], after: ['van'],
-      hint: 'Żaglowiec ma maszt wysoki na 10 metrów.' },
-    { name: 'Nabrzeże', sides: 2, gap: 13, yB: 7, ship: 'barka', before: ['van'], after: ['car'],
-      hint: 'Dostawczak przed barką, auto po niej.' },
-    { name: 'Ciężki ładunek', sides: 2, gap: 11, ship: 'jacht', before: ['truck'], after: ['truck'],
-      hint: 'Ciężarówka na wspornikach. Skrzydła muszą być bardzo sztywne.' },
-    { name: 'Godziny szczytu', sides: 2, gap: 13, ship: 'statek', before: ['car', 'van'], after: ['car'],
-      hint: 'Trzy pojazdy i statek. Licz, kto już przejechał.' },
+    // ---------- Rozdział 2: Przeciwwagi ----------
+    { name: 'Pierwsza przeciwwaga', sides: 1, gap: 6, ship: 'jacht', torque: 20, pit: { w: 3, d: 4 }, before: ['car'], after: ['car'],
+      hint: 'Napęd jest za słaby. Przedłuż skrzydło nad studnię za zawiasem i obciąż ogon przeciwwagą.' },
+    { name: 'Słaby silnik', sides: 2, gap: 11, ship: 'barka', torque: 20, pit: { w: 3, d: 4 }, before: ['car'], after: ['car'],
+      hint: 'Oba skrzydła potrzebują przeciwwag – jezdnia nad studnią też musi utrzymać auto.' },
+    { name: 'Ciężkie skrzydło', sides: 1, gap: 7, yB: 7, ship: 'zaglowiec', torque: 75, pit: { w: 4, d: 5 }, before: ['car'], after: ['car'],
+      hint: 'Długie skrzydło i wysoki maszt. Równowaga jest ważniejsza niż siła napędu.' },
+    { name: 'Wywrotka', sides: 2, gap: 11, ship: 'statek', torque: 30, pit: { w: 3, d: 4 }, before: ['van'], after: ['car'],
+      hint: 'Za ciężka przeciwwaga szarpnie skrzydłem w górę, za lekka – nie pozwoli go podnieść.' },
+    { name: 'Równowaga', sides: 2, gap: 13, ship: 'prom', torque: 75, pit: { w: 4, d: 5 }, before: ['van', 'car'], after: ['van'],
+      hint: 'Długie skrzydła – rozłóż przeciwwagę na całym ogonie.' },
 
-    // ---------- Rozdział 3 ----------
-    { name: 'Żaglowiec', sides: 2, gap: 13, yB: 7, ship: 'zaglowiec', before: ['van'], after: ['van'],
-      hint: 'Wysoki maszt – skrzydła muszą stanąć prawie pionowo.' },
-    { name: 'Most portowy', sides: 2, gap: 15, ship: 'statek', before: ['van'], after: ['car'],
-      hint: 'Dłuższe skrzydła to większy moment na zawiasach.' },
-    { name: 'Jedno skrzydło', sides: 1, gap: 8, yB: 7, ship: 'statek', before: ['van'], after: ['van'],
-      hint: 'Szeroki statek i tylko jedno skrzydło.' },
-    { name: 'Kontenerowiec', sides: 2, gap: 15, ship: 'kontenerowiec', before: ['truck'], after: ['truck'],
-      hint: 'Największy statek w porcie. Skrzydła nie mogą być grube.' },
-    { name: 'Wielkie otwarcie', sides: 2, gap: 17, yB: 8, ship: 'zaglowiec', before: ['car', 'van', 'truck'], after: ['van'],
-      hint: 'Finał rozdziału: trzy pojazdy, żaglowiec i jeszcze jeden pojazd na koniec.' },
+    // ---------- Rozdział 3: Pylony i liny ----------
+    { name: 'Liny', sides: 1, gap: 10, ship: 'holownik', pylon: { dx: 2, h: 6 }, before: ['truck'], after: ['van'],
+      hint: 'Ciężarówka na długim skrzydle. Podwieś skrzydło liną do pylonu – przy podnoszeniu lina się poluzuje.' },
+    { name: 'Most wantowy', sides: 2, gap: 15, ship: 'statek', pylon: { dx: 2, h: 7 }, before: ['truck'], after: ['truck'],
+      hint: 'Liny z obu pylonów odciążają skrzydła.' },
+    { name: 'Wysoki pylon', sides: 1, gap: 9, yB: 7, ship: 'zaglowiec', pylon: { dx: 2, h: 8 }, before: ['van'], after: ['van'],
+      hint: 'Jedno długie skrzydło i wysoki maszt.' },
+    { name: 'Ciężki port', sides: 2, gap: 17, ship: 'kontenerowiec', pylon: { dx: 2, h: 8 }, before: ['tanker'], after: ['truck'],
+      hint: 'Cysterna na ośmiometrowych skrzydłach. Bez lin się nie obejdzie.' },
+    { name: 'Wanty i przeciwwagi', sides: 2, gap: 13, ship: 'prom', torque: 60, pit: { w: 3, d: 4 }, pylon: { dx: 5, h: 7 }, before: ['van'], after: ['van'],
+      hint: 'Słaby napęd i ciężarówka: połącz liny z przeciwwagą.' },
 
-    // ---------- Rozdział 4: Miasto nad rzeką ----------
-    { name: 'Holownik', sides: 1, gap: 8, ship: 'holownik', before: ['car'], after: ['van'],
-      hint: 'Holownik jest niski, ale szeroki jak na swój rozmiar.' },
-    { name: 'Bulwar', sides: 2, gap: 13, ship: 'barka', before: ['car', 'van'], after: ['car'],
-      hint: 'Dwa pojazdy przed barką. Most musi unieść oba naraz.' },
-    { name: 'Prom', sides: 2, gap: 15, ship: 'prom', before: ['van'], after: ['van'],
-      hint: 'Prom jest szeroki na 6 metrów. Skrzydła nie mogą wystawać nad kanał.' },
-    { name: 'Most miejski', sides: 2, gap: 13, yB: 7, ship: 'statek', before: ['car', 'car', 'car'], after: ['car'],
-      hint: 'Trzy auta jedno za drugim, potem statek pasażerski.' },
-    { name: 'Śluza', sides: 1, gap: 9, yB: 8, ship: 'jacht', before: ['truck'], after: ['car'],
-      hint: 'Wysokie nabrzeże i ciężarówka na jednym skrzydle.' },
-    { name: 'Dwie ciężarówki', sides: 2, gap: 11, ship: 'holownik', before: ['truck'], after: ['truck'],
-      hint: 'Ciężarówka przed holownikiem i ciężarówka po nim – z dowolnej strony.' },
-    { name: 'Wieczorny rejs', sides: 2, gap: 15, yB: 7, ship: 'statek', before: ['van', 'van'], after: ['van'],
-      hint: 'Dwa dostawczaki na długich skrzydłach.' },
-    { name: 'Stary port', sides: 1, gap: 10, ship: 'barka', before: ['van'], after: ['van'],
-      hint: 'Długie pojedyncze skrzydło. Wzmocnij je przy zawiasie.' },
-    { name: 'Wysoki maszt', sides: 2, gap: 13, yB: 8, ship: 'zaglowiec', before: ['car', 'van'], after: ['car'],
-      hint: 'Żaglowiec potrzebuje skrzydeł podniesionych prawie pionowo.' },
-    { name: 'Konwój ciężarówek', sides: 2, gap: 13, ship: 'barka', before: ['truck', 'truck'], after: ['truck'],
-      hint: 'Trzy ciężarówki. Skrzydła muszą być naprawdę sztywne.' },
-    { name: 'Wąskie gardło', sides: 1, gap: 11, ship: 'holownik', before: ['car'], after: ['car'],
-      hint: 'Dziesięciometrowe skrzydło na jednym zawiasie.' },
-    { name: 'Nabrzeże zbożowe', sides: 2, gap: 17, ship: 'prom', before: ['van', 'truck'], after: ['van'],
-      hint: 'Szeroki kanał i ciężarówka na końcu kolumny.' },
-    { name: 'Most nad zatoką', sides: 2, gap: 17, yB: 8, ship: 'zaglowiec', before: ['car'], after: ['van'],
-      hint: 'Wysokie nabrzeża i wysoki maszt.' },
-    { name: 'Kontenery', sides: 2, gap: 15, yB: 7, ship: 'kontenerowiec', before: ['van', 'van'], after: ['truck'],
-      hint: 'Kontenerowiec, a po nim ciężarówka z dowolnej strony.' },
-    { name: 'Festiwal żagli', sides: 2, gap: 19, yB: 8, ship: 'zaglowiec', before: ['car', 'car', 'van'], after: ['car'],
-      hint: 'Finał rozdziału: długie skrzydła i trzy pojazdy przed żaglowcem.' },
+    // ---------- Rozdział 4: Filary i skarpy ----------
+    { name: 'Filar zwodzony', sides: 1, approach: 6, gap: 7, ship: 'jacht', before: ['car'], after: ['car'],
+      hint: 'Zawias stoi na filarze. Od brzegu do filaru zbuduj zwykły, nieruchomy most.' },
+    { name: 'Dwa filary', sides: 2, approach: 6, gap: 11, ship: 'barka', before: ['van'], after: ['car'],
+      hint: 'Dwa mosty dojazdowe i dwa skrzydła.' },
+    { name: 'Różne brzegi', sides: 2, gap: 13, yL: 6, yR: 8, ship: 'statek', before: ['car', 'van'], after: ['car'],
+      hint: 'Brzegi mają różną wysokość – skrzydła muszą spotkać się pośrodku, więc będą pochylone.' },
+    { name: 'Most na filarze', sides: 1, approach: 8, gap: 9, ship: 'holownik', before: ['truck'], after: ['car'],
+      hint: 'Długi most dojazdowy dla ciężarówki i skrzydło na filarze.' },
+    { name: 'Pod górę', sides: 1, gap: 9, yL: 6, yR: 8, ship: 'jacht', before: ['van'], after: ['van'],
+      hint: 'Skrzydło musi wznosić się do wyższego brzegu.' },
+    { name: 'Długi dojazd', sides: 2, approach: 10, gap: 11, ship: 'prom', before: ['car'], after: ['van'],
+      hint: 'Dziesięciometrowe mosty dojazdowe potrzebują solidnych kratownic.' },
+    { name: 'Schodki', sides: 2, gap: 13, yL: 7, yR: 5, ship: 'barka', before: ['van'], after: ['van'],
+      hint: 'Prawy brzeg niżej. Skrzydła spotkają się na wysokości 6 m.' },
+    { name: 'Ciężarówki na filarach', sides: 2, approach: 6, gap: 11, ship: 'jacht', before: ['truck', 'truck'], after: ['truck'],
+      hint: 'Trzy ciężarówki na mostach dojazdowych i skrzydłach.' },
+    { name: 'Wanty na skarpie', sides: 1, gap: 10, yL: 6, yR: 7, ship: 'zaglowiec', pylon: { dx: 2, h: 6 }, before: ['van'], after: ['van'],
+      hint: 'Wznoszące się skrzydło podwieszone do pylonu.' },
+    { name: 'Przeciwwaga pod górę', sides: 1, gap: 7, yL: 6, yR: 7, ship: 'jacht', torque: 35, pit: { w: 3, d: 4 }, before: ['car'], after: ['car'],
+      hint: 'Słaby napęd i skrzydło wznoszące się do wyższego brzegu.' },
+    { name: 'Szeroki dojazd', sides: 1, approach: 10, gap: 8, ship: 'statek', before: ['van'], after: ['van'],
+      hint: 'Długi most dojazdowy i krótkie, mocne skrzydło.' },
+    { name: 'Wieczorny ruch', sides: 2, gap: 15, yB: 7, ship: 'prom', pylon: { dx: 2, h: 7 }, before: ['car', 'car', 'van'], after: ['van'],
+      hint: 'Trzy pojazdy na skrzydłach podwieszonych do pylonów.' },
+    { name: 'Most nad zatoką', sides: 2, approach: 8, gap: 13, yB: 8, ship: 'zaglowiec', before: ['van'], after: ['car'],
+      hint: 'Wysokie filary i długie mosty dojazdowe.' },
+    { name: 'Ciężki most', sides: 2, gap: 13, ship: 'statek', torque: 70, pit: { w: 4, d: 5 }, before: ['van'], after: ['van'],
+      hint: 'Dostawczaki i słaby napęd – przeciwwaga musi być ciężka.' },
+    { name: 'Festiwal', sides: 2, approach: 6, gap: 15, yL: 6, yR: 7, ship: 'zaglowiec', before: ['car', 'van'], after: ['car'],
+      hint: 'Finał rozdziału: filary, różne brzegi i wysoki maszt.' },
 
     // ---------- Rozdział 5: Wielki port ----------
-    { name: 'Port przeładunkowy', sides: 2, gap: 17, ship: 'kontenerowiec', before: ['truck'], after: ['truck'],
-      hint: 'Ciężarówki na długich skrzydłach i największy statek.' },
-    { name: 'Jedno długie skrzydło', sides: 1, gap: 11, yB: 7, ship: 'statek', before: ['van'], after: ['van'],
-      hint: 'Szeroki statek i tylko jedno skrzydło.' },
-    { name: 'Godzina zero', sides: 2, gap: 15, ship: 'prom', before: ['car', 'van', 'truck'], after: ['car'],
-      hint: 'Trzy różne pojazdy przed promem.' },
-    { name: 'Nocny transport', sides: 2, gap: 19, yB: 7, ship: 'statek', before: ['truck'], after: ['van'],
-      hint: 'Ciężarówka na dziewięciometrowych skrzydłach.' },
-    { name: 'Cysterna', sides: 2, gap: 13, ship: 'barka', before: ['tanker'], after: ['car'],
-      hint: 'Najcięższy pojazd w grze na moście zwodzonym.' },
-    { name: 'Rzeka w mieście', sides: 1, gap: 10, yB: 8, ship: 'zaglowiec', before: ['car'], after: ['truck'],
-      hint: 'Po żaglowcu przejedzie ciężarówka – z dowolnej strony.' },
-    { name: 'Pod prąd', sides: 2, gap: 17, ship: 'holownik', before: ['van', 'van', 'van'], after: ['van'],
-      hint: 'Cztery dostawczaki w jednym teście.' },
-    { name: 'Szeroki kanał', sides: 2, gap: 21, ship: 'kontenerowiec', before: ['car'], after: ['car'],
+    { name: 'Port przeładunkowy', sides: 2, gap: 17, ship: 'kontenerowiec', pylon: { dx: 2, h: 8 }, before: ['truck'], after: ['truck'],
+      hint: 'Ciężarówki na ośmiometrowych skrzydłach.' },
+    { name: 'Jedno długie skrzydło', sides: 1, gap: 10, ship: 'statek', pylon: { dx: 2, h: 9 }, before: ['van'], after: ['van'],
+      hint: 'Dziewięciometrowe skrzydło – liny są niezbędne.' },
+    { name: 'Godzina zero', sides: 2, approach: 6, gap: 15, ship: 'prom', before: ['car', 'van', 'truck'], after: ['car'],
+      hint: 'Trzy różne pojazdy na filarach i skrzydłach.' },
+    { name: 'Nocny transport', sides: 2, gap: 19, ship: 'statek', pylon: { dx: 2, h: 9 }, before: ['truck'], after: ['van'],
+      hint: 'Dziewięciometrowe skrzydła podwieszone do pylonów.' },
+    { name: 'Cysterna', sides: 2, gap: 11, ship: 'barka', torque: 80, pit: { w: 4, d: 5 }, before: ['tanker'], after: ['car'],
+      hint: 'Najcięższy pojazd, słaby napęd i krótkie skrzydła.' },
+    { name: 'Rzeka w mieście', sides: 1, gap: 8, yL: 7, yR: 8, ship: 'zaglowiec', torque: 70, pit: { w: 3, d: 4 }, before: ['car'], after: ['car'],
+      hint: 'Wznoszące się skrzydło z przeciwwagą.' },
+    { name: 'Pod prąd', sides: 2, approach: 8, gap: 13, yL: 6, yR: 8, ship: 'holownik', before: ['van', 'van'], after: ['van'],
+      hint: 'Filary i różne wysokości brzegów.' },
+    { name: 'Szeroki kanał', sides: 2, gap: 21, ship: 'kontenerowiec', pylon: { dx: 2, h: 10 }, before: ['car'], after: ['car'],
       hint: 'Dziesięciometrowe skrzydła z każdej strony.' },
-    { name: 'Ciężki ruch', sides: 2, gap: 15, yB: 7, ship: 'prom', before: ['truck', 'truck'], after: ['truck'],
-      hint: 'Trzy ciężarówki i szeroki prom.' },
-    { name: 'Latarnia', sides: 1, gap: 11, yB: 8, ship: 'holownik', before: ['truck'], after: ['van'],
-      hint: 'Ciężarówka na najdłuższym pojedynczym skrzydle.' },
-    { name: 'Regaty', sides: 2, gap: 19, yB: 8, ship: 'zaglowiec', before: ['van', 'car', 'van'], after: ['car'],
-      hint: 'Długie skrzydła i wysoki maszt.' },
-    { name: 'Paliwo', sides: 2, gap: 15, ship: 'barka', before: ['tanker'], after: ['tanker'],
-      hint: 'Dwie cysterny: jedna przed barką, druga po niej.' },
-    { name: 'Wielki prom', sides: 2, gap: 21, yB: 7, ship: 'prom', before: ['van', 'van'], after: ['truck'],
-      hint: 'Najszerszy kanał i ciężarówka na koniec.' },
-    { name: 'Nabrzeże portowe', sides: 2, gap: 19, ship: 'kontenerowiec', before: ['truck', 'van'], after: ['truck'],
-      hint: 'Ciężki ruch w największym porcie.' },
-    { name: 'Wielki port', sides: 2, gap: 21, yB: 9, ship: 'zaglowiec', before: ['car', 'van', 'truck', 'van'], after: ['truck'],
-      hint: 'Wielki finał: cztery pojazdy, żaglowiec i ciężarówka z dowolnej strony.' },
+    { name: 'Ciężki ruch', sides: 2, gap: 13, ship: 'prom', torque: 80, pit: { w: 4, d: 5 }, before: ['truck'], after: ['truck'],
+      hint: 'Trzy ciężarówki i przeciwwagi.' },
+    { name: 'Latarnia', sides: 1, approach: 8, gap: 8, ship: 'holownik', before: ['van'], after: ['van'],
+      hint: 'Długi most dojazdowy i siedmiometrowe skrzydło na filarze.' },
+    { name: 'Regaty', sides: 2, gap: 19, yB: 8, ship: 'zaglowiec', pylon: { dx: 3, h: 9 }, before: ['van', 'car', 'van'], after: ['car'],
+      hint: 'Długie skrzydła, wysokie pylony i wysoki maszt.' },
+    { name: 'Paliwo', sides: 2, gap: 15, ship: 'barka', pylon: { dx: 2, h: 7 }, before: ['tanker'], after: ['tanker'],
+      hint: 'Dwie cysterny: przed barką i po niej.' },
+    { name: 'Wielki prom', sides: 2, approach: 8, gap: 17, ship: 'prom', before: ['van', 'van'], after: ['truck'],
+      hint: 'Najszerszy kanał z filarami.' },
+    { name: 'Nabrzeże portowe', sides: 2, gap: 17, ship: 'kontenerowiec', torque: 100, pit: { w: 3, d: 4 }, pylon: { dx: 4, h: 9 }, before: ['truck', 'van'], after: ['truck'],
+      hint: 'Słaby napęd, długie skrzydła i ciężarówki – wszystko naraz.' },
+    { name: 'Wielki port', sides: 2, approach: 6, gap: 17, yL: 8, yR: 9, ship: 'zaglowiec', before: ['car', 'van', 'truck', 'van'], after: ['truck'],
+      hint: 'Wielki finał: filary, różne brzegi, cztery pojazdy i żaglowiec.' },
   ];
 
   function buildDraw(spec, i, opts) {
-    const xL = X_LEFT, gap = spec.gap, xR = xL + gap;
-    const yB = spec.yB != null ? spec.yB : 6;
-    const water = 1.2;
     const two = spec.sides === 2;
-    const leaf = two ? (gap - 1) / 2 : gap - 1;
+    const yL = spec.yL != null ? spec.yL : spec.yB != null ? spec.yB : 6;
+    const yR = spec.yR != null ? spec.yR : spec.yB != null ? spec.yB : 6;
+    const water = 1.2;
+    const aL = spec.approach || 0;
+    const aR = two ? aL : 0;
+    const pit = spec.pit && !aL ? spec.pit : null;
+    const bankL = X_LEFT + (pit ? pit.w : 0);
+    const hL = bankL + (aL ? aL + 2 : 0);        // lewy zawias (na brzegu albo na filarze)
+    const hR = hL + spec.gap;                    // prawy zawias albo krawędź prawego brzegu
+    const bankR = hR + (aR ? aR + 2 : 0);        // krawędź prawego brzegu
+
+    const terrain = [];
+    const notchBank = (edge, y, dir, p) => {
+      // brzeg ze studnią przeciwwagi tuż za zawiasem; ściana pod zawiasem kończy się 2,6 m niżej,
+      // żeby zmieściła się kratownica ogona
+      const far = dir > 0 ? FAR_L : FAR_R;
+      if (!p) return dir > 0 ? [[far, BOTTOM], [edge, BOTTOM], [edge, y], [far, y]] : [[edge, y], [edge, BOTTOM], [far, BOTTOM], [far, y]];
+      const t = edge - dir * 0.6, b = edge - dir * p.w, wy = y - 2.6;
+      return dir > 0
+        ? [[far, BOTTOM], [edge, BOTTOM], [edge, wy], [t, wy], [t, y - p.d], [b, y - p.d], [b, y], [far, y]]
+        : [[edge, wy], [edge, BOTTOM], [far, BOTTOM], [far, y], [b, y], [b, y - p.d], [t, y - p.d], [t, wy]];
+    };
+    terrain.push(notchBank(bankL, yL, 1, pit));
+    terrain.push(notchBank(bankR, yR, -1, two && pit ? pit : null));
+    const pier = (x0, y) => [[x0, BOTTOM], [x0, y], [x0 + 2, y], [x0 + 2, BOTTOM]];
+    if (aL) terrain.push(pier(bankL + aL, yL));
+    if (aR) terrain.push(pier(hR, yR));
+
+    const motors = [{ x: hL, y: yL, dir: 1 }];
+    if (two) motors.push({ x: hR, y: yR, dir: -1 });
+    const anchors = motors.map(m => [m.x, m.y]);
+    const spans = [];
+    if (aL) { anchors.push([bankL, yL], [bankL + aL, yL]); spans.push({ a: [bankL, yL], b: [bankL + aL, yL] }); }
+    if (aR) { anchors.push([hR + 2, yR], [bankR, yR]); spans.push({ a: [hR + 2, yR], b: [bankR, yR] }); }
+    const pylons = [];
+    if (spec.pylon) {
+      for (const m of motors) {
+        const px = m.x - m.dir * spec.pylon.dx, top = m.y + spec.pylon.h;
+        pylons.push({ x: px, y0: m.y, y1: top });
+        anchors.push([px, top]);
+      }
+    }
+    const tipY = two ? Math.round((yL + yR) / 2) : yR;
+    const leaves = two
+      ? [{ m: 0, tipX: hL + (spec.gap - 1) / 2, tipY }, { m: 1, tipX: hR - (spec.gap - 1) / 2, tipY }]
+      : [{ m: 0, tipX: hR - 1, tipY }];
+    for (const lf of leaves) {
+      const m = motors[lf.m];
+      if (pit && (lf.m === 0 || two)) lf.pit = pit;
+      if (spec.pylon) lf.pylon = [m.x - m.dir * spec.pylon.dx, m.y + spec.pylon.h];
+    }
+    const seamPoints = [];
+    if (!two) seamPoints.push([hR, yR]);
+    if (pit) {
+      seamPoints.push([bankL - pit.w, yL]);
+      if (two) seamPoints.push([bankR + pit.w, yR]);
+    }
+
     const ship = global.Physics.SHIPS[spec.ship];
     const shipTop = Math.max(...ship.parts.map(pt => pt[1]));
-    const top = Math.ceil(Math.max(yB + 8, water + shipTop + 2, yB + leaf + 2));
-    const motors = [{ x: xL, y: yB, dir: 1 }];
-    if (two) motors.push({ x: xR, y: yB, dir: -1 });
+    const leafLen = two ? (spec.gap - 1) / 2 : spec.gap - 1;
+    const yMax = Math.max(yL, yR);
+    const top = Math.ceil(Math.max(yMax + 8, water + shipTop + 2, yMax + leafLen + 2, spec.pylon ? yMax + spec.pylon.h + 2 : 0));
+    const leftEnd = X_LEFT, rightEnd = bankR + (two && pit ? pit.w : 0);
     const budgets = opts.budgets || [];
     return {
       name: spec.name,
       hint: spec.hint,
       chapter: chapterOf(i, opts.chapters),
-      view: { x0: 0, x1: xR + 8, y0: 0, y1: top },
-      build: { x0: 1, x1: xR + 7, y0: 1, y1: top - 1 },
-      terrain: [
-        [[FAR_L, BOTTOM], [xL, BOTTOM], [xL, yB], [FAR_L, yB]],
-        [[xR, yB], [xR, BOTTOM], [FAR_R, BOTTOM], [FAR_R, yB]],
-      ],
+      view: { x0: 0, x1: rightEnd + 8, y0: 0, y1: top },
+      build: { x0: 1, x1: rightEnd + 7, y0: 1, y1: top - 1 },
+      terrain,
       water,
-      anchors: motors.map(m => [m.x, m.y]),
+      anchors,
       motors,
-      seamPoints: two ? [] : [[xR, yB]],
+      leaves,
+      spans,
+      pylons,
+      torque: spec.torque || 600,
+      seamPoints,
       ship: spec.ship,
-      shipX: two ? (xL + xR) / 2 : (xL + xR) / 2 + 1,
-      start: { x: xL - 6, y: yB },
-      finish: xR + 4,
-      startR: { x: xR + 6, y: yB },   // start pojazdu jadącego w lewo
-      finishL: xL - 4,                // meta pojazdu jadącego w lewo
+      shipX: two ? (hL + hR) / 2 : (hL + hR) / 2 + 1,
+      start: { x: leftEnd - 6, y: yL },
+      finish: rightEnd + 4,
+      startR: { x: rightEnd + 6, y: yR },
+      finishL: leftEnd - 4,
       budget: spec.budget || budgets[i] || 99999,
       vehicle: spec.before[0],
       convoy: [
@@ -463,10 +522,112 @@
     };
   }
 
+  // ---------- Wersja ze skocznią ----------
+  // gap      – szerokość przepaści, lewa krawędź na x = 16 (przed nią rozbieg)
+  // yL, yR   – wysokość brzegu startowego i brzegu lądowania
+  // speed    – prędkość motocyklisty [m/s]
+  // anchorsL – kotwy po stronie startu: [dx, dy] względem krawędzi (dx ≤ 0 to podłoże, [0, -d] to ściana)
+  // anchorsR – kotwy po stronie lądowania: [dx, dy] względem krawędzi drugiego brzegu
+  // ditch    – rów na rozbiegu: x0, x1 (względem krawędzi, ujemne), d – głębokość
+  // rocks    – skały w przepaści: x, w, top; anchors: true – kotwy na szczycie skały
+  const JUMP_CHAPTERS = [
+    { name: 'Pierwsze skoki', count: 5, desc: 'Rampa na kilku kotwach, rozpęd i przelot nad przepaścią.' },
+    { name: 'Kaskaderzy', count: 5, desc: 'Rowy, nawisy i skały. Każda plansza wymaga innej rampy.' },
+    { name: 'Mistrzowie przestworzy', count: 5, desc: 'Najdłuższe skoki. Rampy lądowania podparte na skałach i ścianach.' },
+  ];
+
+  const JUMP_SPECS = [
+    // ---------- Rozdział 1 ----------
+    { name: 'Pierwszy skok', gap: 8, speed: 14, anchorsL: [[-6, 0], [-3, 0], [0, 0]],
+      hint: 'Rampa zaczyna się na ziemi i wznosi do krawędzi. Oprzyj ją na trzech kotwach.' },
+    { name: 'Daleko od krawędzi', gap: 12, speed: 15, anchorsL: [[-9, 0], [-5, 0], [0, -3]],
+      hint: 'Kotwy są daleko od krawędzi – ostatni fragment rampy podeprzyj z kotwy na ścianie.' },
+    { name: 'W dół', gap: 12, yL: 9, yR: 6, speed: 15, anchorsL: [[-6, 0], [0, 0]], anchorsR: [[0, 0], [4, 0], [8, 0]],
+      hint: 'Drugi brzeg jest niżej. Rampa do lądowania pozwoli uniknąć wywrotki.' },
+    { name: 'Rów', gap: 10, speed: 15, ditch: { x0: -7, x1: -3, d: 3 }, anchorsL: [[-10, 0], [-7, 0], [-3, 0], [0, 0]],
+      hint: 'Na rozbiegu jest rów. Rampa musi go przekryć.' },
+    { name: 'Skała w przepaści', gap: 14, speed: 16, rocks: [{ x: 6, w: 2, top: 9.5 }], anchorsL: [[-6, 0], [-3, 0], [0, -2]],
+      hint: 'Przeskocz nad skałą. Jeśli kierowca jej dotknie, będzie wywrotka.' },
+
+    // ---------- Rozdział 2 ----------
+    { name: 'Nawis', gap: 16, speed: 16, anchorsL: [[-7, 0], [-4, 0], [0, -2], [0, -5]],
+      hint: 'Rampę trzeba wysunąć nad przepaść, podpierając ją z kotew na ścianie.' },
+    { name: 'Miękkie lądowanie', gap: 14, yL: 10, yR: 6, speed: 15, anchorsL: [[-6, 0], [-2, 0]], anchorsR: [[2, 0], [6, 0], [0, -3]],
+      hint: 'Duży spadek. Bez rampy lądowania kierowca się wywróci.' },
+    { name: 'Półka', gap: 20, speed: 15, anchorsL: [[-8, 0], [-4, 0], [0, 0]], anchorsR: [[0, -2], [0, -5], [3, 0]],
+      hint: 'Za daleko na zwykły skok. Wysuń rampę lądowania nad przepaść z kotew na ścianie.' },
+    { name: 'Dwie skały', gap: 18, speed: 17, rocks: [{ x: 5, w: 2, top: 10 }, { x: 11, w: 2, top: 11 }], anchorsL: [[-4, 0], [0, 0]], anchorsR: [[0, 0], [4, 0], [8, 0]],
+      hint: 'Dwie skały na drodze. Skok musi być wysoki.' },
+    { name: 'Wysoki brzeg', gap: 12, yR: 11, speed: 16, ditch: { x0: -5, x1: -2, d: 2 }, anchorsL: [[-9, 0], [-5, 0], [-2, 0], [0, 0]], anchorsR: [[0, 0]],
+      hint: 'Brzeg lądowania jest 3 metry wyżej, a przed krawędzią jest rów.' },
+
+    // ---------- Rozdział 3 ----------
+    { name: 'Wielki kanion', gap: 24, speed: 18, anchorsL: [[-10, 0], [-6, 0], [-2, 0]], anchorsR: [[0, -2], [0, 0], [4, 0], [8, 0]],
+      hint: 'Pełna prędkość i idealny kąt. Ostatnie dwa metry rampy bez kotwy.' },
+    { name: 'Przez wieżę', gap: 18, speed: 17, rocks: [{ x: 8, w: 2, top: 11.5 }], anchorsL: [[-8, 0], [-4, 0], [0, -2]], anchorsR: [[0, 0], [5, 0]],
+      hint: 'Wysoka skała na środku. Leć wysoko.' },
+    { name: 'Ratunkowa rampa', gap: 24, speed: 15, rocks: [{ x: 16, w: 2, top: 4, anchors: true }], anchorsL: [[-8, 0], [-4, 0], [0, 0]], anchorsR: [[0, -2], [0, 0]],
+      hint: 'Motocykl nie doleci do brzegu – rampa lądowania musi go złapać nad przepaścią. Podeprzyj ją na skale.' },
+    { name: 'Zjazd w dolinę', gap: 18, yL: 11, yR: 7, speed: 15, anchorsL: [[-4, 0], [0, -3]], anchorsR: [[0, -2], [0, -5], [3, 0], [7, 0]],
+      hint: 'Cztery metry w dół. Rampa lądowania zaczyna się nad przepaścią.' },
+    { name: 'Skok życia', gap: 28, yL: 10, yR: 9, speed: 18, rocks: [{ x: 20, w: 2, top: 4, anchors: true }], anchorsL: [[-10, 0], [-5, 0], [0, 0]], anchorsR: [[0, -2], [0, 0], [6, 0]],
+      hint: 'Najdłuższy skok w grze. Obie rampy muszą być perfekcyjne.' },
+  ];
+
+  function buildJump(spec, i, opts) {
+    const xL = 16, gap = spec.gap, xR = xL + gap;
+    const yL = spec.yL != null ? spec.yL : 8;
+    const yR = spec.yR != null ? spec.yR : 8;
+    const aL = spec.anchorsL || [], aR = spec.anchorsR || [];
+    const depthL = Math.max(3, ...aL.filter(a => a[1] < 0).map(a => -a[1])) + 1;
+    const depthR = Math.max(3, ...aR.filter(a => a[1] < 0).map(a => -a[1])) + 1;
+    const left = [[FAR_L, BOTTOM], [xL - 0.3, BOTTOM], [xL - 0.4, 2.5], [xL, yL - depthL], [xL, yL]];
+    if (spec.ditch) {
+      const dt = spec.ditch;
+      left.push([xL + dt.x1, yL], [xL + dt.x1, yL - dt.d], [xL + dt.x0, yL - dt.d], [xL + dt.x0, yL]);
+    }
+    left.push([FAR_L, yL]);
+    const terrain = [left, [[xR, yR], [xR, yR - depthR], [xR + 0.4, 2.5], [xR + 0.3, BOTTOM], [FAR_R, BOTTOM], [FAR_R, yR]]];
+    const anchors = [...aL.map(a => [xL + a[0], yL + a[1]]), ...aR.map(a => [xR + a[0], yR + a[1]])];
+    for (const r of spec.rocks || []) {
+      const x0 = xL + r.x, x1 = x0 + r.w, t = r.top;
+      if (r.anchors) {
+        terrain.push([[x0 - 0.5, BOTTOM], [x0, t - 1], [x0, t], [x1, t], [x1, t - 1], [x1 + 0.5, BOTTOM]]);
+        anchors.push([x0, t], [x1, t]);
+      } else {
+        terrain.push([[x0 - 0.6, BOTTOM], [x0 - 0.2, t - 2], [x0 + 0.3, t], [x1 - 0.3, t], [x1 + 0.2, t - 2], [x1 + 0.6, BOTTOM]]);
+      }
+    }
+    const top = Math.max(yL, yR) + 10;
+    const budgets = opts.budgets || [];
+    return {
+      name: spec.name,
+      hint: spec.hint,
+      chapter: chapterOf(i, opts.chapters),
+      view: { x0: 0, x1: xR + 16, y0: 0, y1: top },
+      build: { x0: 1, x1: xR + 15, y0: 1, y1: top - 1 },
+      terrain,
+      water: 1.2,
+      anchors,
+      edgeL: [xL, yL],
+      edgeR: [xR, yR],
+      start: { x: 2, y: yL },
+      finish: xR + 13,
+      landX: xR,
+      budget: spec.budget || budgets[i] || 99999,
+      vehicle: 'moto',
+      motoSpeed: spec.speed || 15,
+      jump: true,
+      spec,
+    };
+  }
+
   global.LEVELS = SPECS.map((s, i) => build(s, i, { budgets: global.LEVEL_BUDGETS, chapters: CHAPTERS }));
   global.CHAPTERS = CHAPTERS;
   global.MIL_LEVELS = MIL_SPECS.map((s, i) => build(s, i, { budgets: global.MIL_BUDGETS, chapters: MIL_CHAPTERS, military: true }));
   global.MIL_CHAPTERS = MIL_CHAPTERS;
   global.DRAW_LEVELS = DRAW_SPECS.map((s, i) => buildDraw(s, i, { budgets: global.DRAW_BUDGETS, chapters: DRAW_CHAPTERS }));
   global.DRAW_CHAPTERS = DRAW_CHAPTERS;
+  global.JUMP_LEVELS = JUMP_SPECS.map((s, i) => buildJump(s, i, { budgets: global.JUMP_BUDGETS, chapters: JUMP_CHAPTERS }));
+  global.JUMP_CHAPTERS = JUMP_CHAPTERS;
 })(typeof window !== 'undefined' ? window : globalThis);

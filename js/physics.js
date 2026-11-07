@@ -11,6 +11,8 @@
     road:  { name: 'Jezdnia',       cost: 200, mass: 100, EA: 4e6, maxT: 34000, maxC: 34000, maxLen: 4,  tensionOnly: false },
     steel: { name: 'Belka stalowa', cost: 120, mass: 40,  EA: 5e6, maxT: 48000, maxC: 38000, maxLen: 5,  tensionOnly: false },
     cable: { name: 'Lina stalowa',  cost: 70,  mass: 8,   EA: 3e6, maxT: 55000, maxC: 0,     maxLen: 12, tensionOnly: true  },
+    // tylko w mostach zwodzonych: ciężkie bloki betonu na ogonie skrzydła
+    counter: { name: 'Przeciwwaga', cost: 80,  mass: 600,  EA: 5e6, maxT: 60000, maxC: 60000, maxLen: 2,  tensionOnly: false },
   };
 
   const VEHICLES = {
@@ -22,6 +24,8 @@
     jeep:   { name: 'Łazik',       style: 'jeep',   wheelbase: 2.2, height: 0.9, r: 0.44, massWheel: 280, massTop: 170, speed: 4.5, accel: 9 },
     apc:    { name: 'Transporter', style: 'apc',    wheelbase: 3.0, height: 1.2, r: 0.5,  massWheel: 500, massTop: 300, speed: 3.6, accel: 8 },
     tank:   { name: 'Czołg',       style: 'tank',   wheelbase: 3.4, height: 1.2, r: 0.55, massWheel: 750, massTop: 450, speed: 2.8, accel: 7 },
+    // skocznia: motocykl startuje rozpędzony, a punkty nadwozia (kierowca) wykrywają wywrotkę
+    moto:   { name: 'Motocykl',    style: 'moto',   wheelbase: 1.5, height: 0.95, r: 0.34, massWheel: 70, massTop: 60, speed: 15, accel: 40, launch: true, rider: true },
   };
 
   // Statki w mostach zwodzonych. parts: [szerokość, wysokość nad wodą] kolejnych brył
@@ -39,8 +43,12 @@
   const SHIP_PASS = 3;       // s – przepływanie przez most (wtedy liczy się kolizja)
   const RAISE_TIME = 4;      // s – pełne podniesienie lub opuszczenie skrzydeł
   const RAISE_ANGLE = 85 * Math.PI / 180;
-  const MOTOR_TORQUE = 600000; // N·m – maksymalny moment napędu zawiasu
   const SEAM_MAX = 1.05;     // m – szczelina przykrywana płytą najazdową
+  const LOCK_TORQUE = 600;   // kN·m – blokada zaryglowanego skrzydła
+  const MOTOR_KP = 100, MOTOR_KD = 20; // regulator napędu (1/s², 1/s)
+  const LAND_MAX = 9;        // m/s – największa prędkość uderzenia przy lądowaniu bez wywrotki
+  const AIR_MIN = 0.15;      // s – po tylu sekundach w powietrzu kontakt z ziemią to lądowanie
+  const AIR_ROT = 1.6;       // rad/s – jak szybko kierowca może obrócić motor w locie
 
   const SUBSTEPS = 40;
   const JOINT_MASS = 6;
@@ -103,10 +111,12 @@
       // Kolumna pojazdów. Tryb cywilny: jeden pojazd.
       const convoy = (level.convoy || [{ type: level.vehicle || 'car', team: 'civil' }])
         .map(c => (c.after && this.opts.afterDir ? Object.assign({}, c, { dir: this.opts.afterDir }) : c));
+      const specOf = (type) => (type === 'moto' && level.motoSpeed ? Object.assign({}, VEHICLES.moto, { speed: level.motoSpeed }) : VEHICLES[type]);
       this.vehicles = convoy.map((c, i) => ({
-        idx: i, type: c.type, team: c.team, spec: VEHICLES[c.type], state: 'waiting',
+        idx: i, type: c.type, team: c.team, spec: specOf(c.type), state: 'waiting',
         parts: null, w1: null, w2: null, rot1: 0, rot2: 0, stillTime: 0,
-        crossed: false, fell: false, target: VEHICLES[c.type].speed, after: !!c.after, dir: c.dir || 1,
+        crossed: false, fell: false, target: specOf(c.type).speed, after: !!c.after, dir: c.dir || 1,
+        crashed: false, crashCause: null, airborne: false, takeoffX: null, jump: 0,
       }));
       if (level.drawbridge) this.initDrawbridge();
       this.spawnVehicles();
@@ -117,6 +127,7 @@
       const lv = this.level, P = this.particles;
       this.raise = 0;
       this.raiseTarget = 0;
+      this.raiseRate = 0;
       this.motors = [];
       for (const m of lv.motors) {
         const idx = P.findIndex(p => p.key === key(m.x, m.y));
@@ -128,7 +139,22 @@
             arms.push({ c, pi, th0: Math.atan2(P[pi].y - m.y, P[pi].x - m.x) });
           }
         }
-        this.motors.push({ x: m.x, y: m.y, dir: m.dir, arms, load: 0 });
+        // wszystkie ruchome węzły połączone z ramionami – na nie działa moment napędu
+        const comp = new Set();
+        const stack = arms.map(a => a.pi);
+        while (stack.length) {
+          const i = stack.pop();
+          if (comp.has(i) || P[i].fixed) continue;
+          comp.add(i);
+          for (const c of this.constraints) {
+            if (!c.beam) continue;
+            if (c.a === i) stack.push(c.b);
+            else if (c.b === i) stack.push(c.a);
+          }
+        }
+        const compList = [...comp];
+        const th0 = compList.map(i => Math.atan2(P[i].y - m.y, P[i].x - m.x));
+        this.motors.push({ x: m.x, y: m.y, dir: m.dir, arms, comp: compList, th0, load: 0 });
       }
 
       // Płyty najazdowe: końce jezdni oddalone o ok. 1 m od innego końca jezdni lub krawędzi brzegu
@@ -151,6 +177,14 @@
           if (Math.hypot(a.x - sp[0], a.y - sp[1]) <= SEAM_MAX) this.seams.push({ a: ends[i], sx: sp[0], sy: sp[1] });
         }
       }
+
+      // Oparcia: węzły leżące dokładnie na krawędzi studni lub brzegu opierają się na niej,
+      // dopóki most jest opuszczony (przy podnoszeniu odrywają się)
+      this.bearings = [];
+      P.forEach((p, i) => {
+        if (p.fixed || !p.key) return;
+        if ((lv.seamPoints || []).some(sp => Math.abs(sp[0] - p.x) < 0.01 && Math.abs(sp[1] - p.y) < 0.01)) this.bearings.push({ i, y: p.y });
+      });
 
       const ship = SHIPS[lv.ship];
       this.ship = {
@@ -191,30 +225,59 @@
       return false;
     }
 
-    // Napęd zawiasu obraca ramiona skrzydła do zadanego kąta (z ograniczonym momentem)
+    // Napęd zawiasu: regulator dąży do zadanego kąta skrzydła, przykładając moment obrotowy
+    // do wszystkich węzłów skrzydła. Moment jest ograniczony (słaby napęd wymaga przeciwwagi).
     solveMotors(h) {
       const P = this.particles;
       const t = this.raise;
       const ang = RAISE_ANGLE * t * t * (3 - 2 * t);
+      // Opuszczony albo w pełni podniesiony most jest zaryglowany; słaby napęd działa tylko w ruchu
+      const moving = this.raiseTarget !== (this.raise > 0.5 ? 1 : 0) || (this.raise > 0.001 && this.raise < 0.999);
+      const torque = (moving ? this.level.torque || 600 : LOCK_TORQUE) * 1000;
       for (const m of this.motors) {
-        let load = 0;
-        const n = m.arms.filter(a => !a.c.broken).length || 1;
+        // kąt skrzydła: średni obrót wszystkich jego węzłów (ważony bezwładnością)
+        let errSum = 0, wsum = 0;
+        m.comp.forEach((i, j) => {
+          const p = P[i];
+          if (p.w === 0) return;
+          const dx = p.x - m.x, dy = p.y - m.y;
+          const r2 = dx * dx + dy * dy;
+          let dth = m.th0[j] + m.dir * ang - Math.atan2(dy, dx);
+          dth = Math.atan2(Math.sin(dth), Math.cos(dth));
+          errSum += p.m * r2 * dth;
+          wsum += p.m * r2;
+        });
+        if (!wsum) { m.load = 0; continue; }
+        const err = errSum / wsum;
+        let I = 0, L = 0;
+        for (const i of m.comp) {
+          const p = P[i];
+          if (p.w === 0) continue;
+          const rx = p.x - m.x, ry = p.y - m.y;
+          I += p.m * (rx * rx + ry * ry);
+          L += p.m * (rx * p.vy - ry * p.vx);
+        }
+        if (!I) { m.load = 0; continue; }
+        const omega = L / I;
+        const cmd = I * (MOTOR_KP * err + MOTOR_KD * (m.dir * this.raiseRate - omega));
+        const tau = Math.max(-torque, Math.min(torque, cmd));
+        m.load = Math.min(1, Math.abs(cmd) / torque);
+        // moment przekazywany przez ramiona przy zawiasie (siły prostopadłe do ramion)
+        let r2sum = 0;
+        for (const arm of m.arms) {
+          if (arm.c.broken) continue;
+          const p = P[arm.pi];
+          r2sum += (p.x - m.x) ** 2 + (p.y - m.y) ** 2;
+        }
+        if (!r2sum) continue;
         for (const arm of m.arms) {
           if (arm.c.broken) continue;
           const p = P[arm.pi];
           if (p.w === 0) continue;
-          const dx = p.x - m.x, dy = p.y - m.y;
-          const r = Math.hypot(dx, dy) || 1e-9;
-          let dth = arm.th0 + m.dir * ang - Math.atan2(dy, dx);
-          dth = Math.atan2(Math.sin(dth), Math.cos(dth));
-          const maxS = (MOTOR_TORQUE / r / n) * h * h * p.w;
-          let sArc = dth * r;
-          if (Math.abs(sArc) > maxS) { sArc = Math.sign(sArc) * maxS; load = 1; }
-          else load = Math.max(load, Math.abs(sArc) / maxS);
-          p.x += (-dy / r) * sArc;
-          p.y += (dx / r) * sArc;
+          const k = (tau / r2sum) * h * p.w;
+          p.vx += -(p.y - m.y) * k;
+          p.vy += (p.x - m.x) * k;
         }
-        m.load = load;
       }
     }
 
@@ -246,6 +309,8 @@
           });
         }
       }
+      if (s.launch) for (const p of parts) p.vx = d * s.speed;
+      if (s.rider) for (const p of [t1, t2]) { p.r = 0.24; p.sensor = true; }
       Object.assign(v, { parts, w1, w2, t1, t2, state: 'active' });
     }
 
@@ -282,8 +347,13 @@
 
       const lv = this.level;
       if (lv.drawbridge) {
-        const rate = dt / RAISE_TIME;
+        // przeciążony napęd stoi w miejscu – skrzydło nie podnosi się dalej
+        this.motorStall = this.motors.some(m => m.load >= 0.999) && this.raise > 0 && this.raise < 1;
+        const rate = this.motorStall ? 0 : dt / RAISE_TIME;
+        const before = this.raise;
         this.raise += Math.max(-rate, Math.min(rate, this.raiseTarget - this.raise));
+        const t = this.raise;
+        this.raiseRate = RAISE_ANGLE * 6 * t * (1 - t) * ((this.raise - before) / dt);
         this.updateShip(dt);
       }
       for (const v of this.vehicles) {
@@ -292,7 +362,7 @@
         v.rot1 -= (v.w1.vx * dt) / r;
         v.rot2 -= (v.w2.vx * dt) / r;
         const speed = Math.hypot(v.w1.vx, v.w1.vy);
-        v.stillTime = speed < 0.15 && Math.abs(v.target) > 0.5 ? v.stillTime + dt : 0;
+        v.stillTime = speed < (v.spec.rider ? 0.4 : 0.15) && Math.abs(v.target) > 0.5 ? v.stillTime + dt : 0;
         if (!v.fell && v.parts.some(p => p.y < lv.water + 0.4)) v.fell = true;
         // pozycja tylnego koła względem mety w kierunku jazdy
         const past = v.dir > 0 ? Math.min(v.w1.x, v.w2.x) - lv.finish : lv.finishL - Math.max(v.w1.x, v.w2.x);
@@ -326,9 +396,16 @@
       const P = this.particles;
       const ih2 = 1 / (h * h);
 
+      // prędkość motocykla przed krokiem (do płynnego prowadzenia po rampie)
+      for (const v of this.vehicles) {
+        if (v.state === 'active' && v.spec.rider) v.preSpeed = Math.hypot((v.w1.vx + v.w2.vx) / 2, (v.w1.vy + v.w2.vy) / 2);
+      }
+
+      // w mostach zwodzonych grawitacja narasta przez pierwsze pół sekundy (bez wstrząsu na starcie)
+      const g = this.level.drawbridge ? G * Math.min(1, this.time / 0.5) : G;
       for (const p of P) {
         if (p.w === 0) continue;
-        p.vy += G * h;
+        p.vy += g * h;
         p.px = p.x; p.py = p.y;
         p.x += p.vx * h;
         p.y += p.vy * h;
@@ -352,7 +429,9 @@
         c.force = -dl * ih2; // > 0 rozciąganie, < 0 ściskanie
       }
 
-      if (this.motors) this.solveMotors(h);
+      if (this.bearings && this.raiseTarget === 0 && this.raise < 0.02) {
+        for (const b of this.bearings) { const p = P[b.i]; if (p.y < b.y) p.y += Math.min(b.y - p.y, 0.0005); }
+      }
       this.solveContacts();
 
       for (const p of P) {
@@ -362,6 +441,56 @@
         const damp = 1 - 0.15 * h;
         p.vx *= damp; p.vy *= damp;
         if (p.y < -15) { p.w = 0; p.dead = true; p.vx = p.vy = 0; }
+      }
+
+      if (this.motors) this.solveMotors(h);
+
+      // Płynne prowadzenie: gdy koła toczą się po rampie (nie lądują), załamania jezdni zmieniają
+      // kierunek jazdy motocykla, ale nie zabierają mu prędkości
+      for (const v of this.vehicles) {
+        if (v.state !== 'active' || !v.spec.rider || v.crashed) continue;
+        if (!v.w1.contact && !v.w2.contact) continue;
+        if ((v.w1.air || 0) > AIR_MIN || (v.w2.air || 0) > AIR_MIN) continue;
+        const sp = Math.hypot((v.w1.vx + v.w2.vx) / 2, (v.w1.vy + v.w2.vy) / 2);
+        if (sp > 0.5 && sp < v.preSpeed) {
+          const k = Math.min(1.5, v.preSpeed / sp);
+          for (const p of v.parts) { p.vx *= k; p.vy *= k; }
+        }
+      }
+
+      // Motocykl w powietrzu: kierowca balansuje ciałem i powoli ustawia motor zgodnie z torem lotu
+      for (const v of this.vehicles) {
+        if (v.state !== 'active' || !v.spec.rider || v.crashed) continue;
+        if ((v.w1.air || 0) < 0.05 || (v.w2.air || 0) < 0.05) continue;
+        const cx = (v.w1.x + v.w2.x) / 2, cy = (v.w1.y + v.w2.y) / 2;
+        const vx = (v.w1.vx + v.w2.vx) / 2, vy = (v.w1.vy + v.w2.vy) / 2;
+        const ang = Math.atan2(v.w2.y - v.w1.y, v.w2.x - v.w1.x);
+        const lim = 0.6;
+        const target = Math.max(-lim, Math.min(lim, Math.atan2(vy, Math.abs(vx)) * Math.sign(vx || 1)));
+        let d = Math.atan2(Math.sin(target - ang), Math.cos(target - ang));
+        const maxRate = AIR_ROT * h;
+        d = Math.max(-maxRate, Math.min(maxRate, d));
+        const c = Math.cos(d), sn = Math.sin(d);
+        for (const p of v.parts) {
+          const rx = p.x - cx, ry = p.y - cy;
+          p.x = cx + rx * c - ry * sn;
+          p.y = cy + rx * sn + ry * c;
+        }
+      }
+
+      // Motocykl: kierowca dotknął ziemi albo lądowanie było za twarde → wywrotka
+      for (const v of this.vehicles) {
+        if (v.state !== 'active' || !v.spec.rider) continue;
+        if (!v.crashed && (v.t1.contact || v.t2.contact)) { v.crashed = true; v.crashCause = 'rider'; }
+        for (const wh of [v.w1, v.w2]) {
+          if (wh.contact) {
+            if (!v.crashed && (wh.air || 0) > AIR_MIN && wh.impact > LAND_MAX) { v.crashed = true; v.crashCause = 'landing'; }
+            wh.air = 0;
+          } else wh.air = (wh.air || 0) + h;
+        }
+        const inAir = !v.w1.contact && !v.w2.contact && !v.t1.contact && !v.t2.contact;
+        if (inAir && !v.airborne && v.w1.air > AIR_MIN) { v.airborne = true; v.takeoffX = Math.max(v.w1.x, v.w2.x); }
+        if (!inAir && v.airborne) { v.airborne = false; v.jump = Math.max(v.jump, Math.min(v.w1.x, v.w2.x) - v.takeoffX); }
       }
 
       // Napęd: koła w kontakcie dążą do prędkości docelowej wzdłuż podłoża
@@ -392,8 +521,10 @@
       const P = this.particles;
       for (const v of this.vehicles) {
         if (v.state !== 'active') continue;
-        for (const wh of [v.w1, v.w2]) {
+        const touching = v.spec.rider ? [v.w1, v.w2, v.t1, v.t2] : [v.w1, v.w2];
+        for (const wh of touching) {
           if (wh.w === 0) continue;
+          wh.impact = 0;
           for (const s of this.segments) this.contact(wh, s[0], s[1], s[2], s[3], null, null);
           for (const c of this.constraints) {
             if (c.broken || c.type !== 'road' || c.half) continue;
@@ -428,6 +559,9 @@
       if (pa) { pa.x -= nx * dl * wa * (1 - t); pa.y -= ny * dl * wa * (1 - t); }
       if (pb) { pb.x -= nx * dl * wb * t; pb.y -= ny * dl * wb * t; }
       if (!wh.contact || ny > wh.contact[1]) wh.contact = [nx, ny];
+      // prędkość zderzenia wzdłuż normalnej (prędkość z poprzedniego kroku)
+      const vn = -(wh.vx * nx + wh.vy * ny);
+      if (vn > (wh.impact || 0)) wh.impact = vn;
     }
 
     // Zerwany element rozpada się na dwie zwisające połówki
@@ -453,6 +587,18 @@
     // Wynik próby: null – jeszcze trwa, { win, msg } – koniec
     result() {
       const vs = this.vehicles;
+      if (this.level.jump) {
+        const v = vs[0];
+        const jump = Math.max(v.jump, v.airborne ? Math.min(v.w1.x, v.w2.x) - v.takeoffX : 0);
+        if (v.fell) return { win: false, msg: 'Motocyklista spadł w przepaść.', reason: 'fell', jump };
+        const landed = Math.min(v.w1.x, v.w2.x) > this.level.landX;
+        if (v.crossed) return { win: true, clean: !v.crashed, cause: v.crashCause, jump };
+        if (v.stillTime > 2 || this.time > 30) {
+          return landed ? { win: true, clean: false, cause: v.crashCause || 'stopped', jump }
+            : { win: false, msg: 'Motocyklista nie przeskoczył przepaści.', reason: 'short', jump };
+        }
+        return null;
+      }
       if (this.level.drawbridge) {
         const lost = vs.find(v => v.fell);
         if (lost) return { win: false, msg: `Pojazd (${lost.spec.name.toLowerCase()}) wpadł do wody.`, reason: 'fell' };
