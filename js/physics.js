@@ -592,7 +592,9 @@
         const jump = Math.max(v.jump, v.airborne ? Math.min(v.w1.x, v.w2.x) - v.takeoffX : 0);
         if (v.fell) return { win: false, msg: 'Motocyklista spadł w przepaść.', reason: 'fell', jump };
         const landed = Math.min(v.w1.x, v.w2.x) > this.level.landX;
-        if (v.crossed) return { win: true, clean: !v.crashed, cause: v.crashCause, jump };
+        // wynik dopiero po wylądowaniu za metą (motocykl nie może być w locie)
+        const onGround = (v.w1.air || 0) < AIR_MIN && (v.w2.air || 0) < AIR_MIN;
+        if (v.crossed && (onGround || v.crashed)) return { win: true, clean: !v.crashed, cause: v.crashCause, jump };
         if (v.stillTime > 2 || this.time > 30) {
           return landed ? { win: true, clean: false, cause: v.crashCause || 'stopped', jump }
             : { win: false, msg: 'Motocyklista nie przeskoczył przepaści.', reason: 'short', jump };

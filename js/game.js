@@ -1037,6 +1037,10 @@
         ctx.stroke();
       }
       ctx.restore();
+      // ponownie kontur skały (ścieżka po warstwach skalnych wskazuje ostatnią warstwę)
+      ctx.beginPath();
+      poly.forEach(([x, y], i) => { const [sx, sy] = W2S(x, y); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); });
+      ctx.closePath();
       ctx.strokeStyle = build ? '#5d7184' : theme().rockLine;
       ctx.lineWidth = 2;
       ctx.stroke();

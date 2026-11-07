@@ -66,7 +66,8 @@ albo z prawej – więc most trzeba opuścić. Kolejne rozdziały wprowadzają:
 - **filary w nurcie** – zawias stoi na filarze, a od brzegu trzeba zbudować nieruchomy most dojazdowy,
 - **brzegi na różnych wysokościach** – skrzydła muszą być pochylone.
 
-**Skocznia** – 15 plansz w trzech rozdziałach. Rozpędzony motocyklista wjeżdża na zbudowaną rampę i przeskakuje
+**Skocznia** – 45 plansz w pięciu rozdziałach: **Pierwsze skoki**, **Kaskaderzy**, **Mistrzowie przestworzy**,
+**Akrobaci** i **Legendy**. Rozpędzony motocyklista wjeżdża na zbudowaną rampę i przeskakuje
 przepaść. Na każdej planszy jest tylko kilka kotew w określonych miejscach: rampę trzeba czasem wysunąć nad
 przepaść z kotew na ścianie, przekryć rów na rozbiegu albo podeprzeć rampę lądowania na skale w przepaści.
 Gwiazdki: ★ za przeskok, ★ za lądowanie bez wywrotki, ★ za koszt do 75% budżetu.
