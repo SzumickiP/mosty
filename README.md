@@ -53,7 +53,8 @@ zanim przejedzie wróg. Na każdej planszy jest inna liczba ładunków dynamitu;
 na belki i liny (nie na jezdnię). Misja jest zaliczona, gdy wszyscy sojusznicy dojadą do flagi,
 a żaden wróg nie przejedzie – wróg może wpaść do przepaści razem z mostem albo zatrzymać się przed wyrwą.
 
-**Zwodzona** – 15 plansz w trzech rozdziałach: **Pierwsze skrzydła**, **Port rzeczny** i **Wielkie statki**.
+**Zwodzona** – 45 plansz w pięciu rozdziałach: **Pierwsze skrzydła**, **Port rzeczny**, **Wielkie statki**,
+**Miasto nad rzeką** i **Wielki port**. Statki: jacht, barka, holownik, prom, statek pasażerski, żaglowiec i kontenerowiec.
 Na nabrzeżu jest zawias z napędem (żółte koło zębate) – z jednej albo z obu stron kanału. Skrzydło mostu
 buduje się tylko na zawiasie i nie łączy z drugim brzegiem. W teście najpierw przejeżdżają pojazdy, potem
 nadpływa statek: trzeba podnieść most (przycisk lub klawisz `P`), a statek musi zmieścić się między

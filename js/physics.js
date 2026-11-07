@@ -32,6 +32,8 @@
     statek:        { name: 'Statek pasażerski', parts: [[5, 1.8], [3.6, 4.2], [1.2, 5.6], [0.3, 7]] },
     zaglowiec:     { name: 'Żaglowiec',         parts: [[3.4, 1.5], [2.6, 8.5], [0.35, 10]] },
     kontenerowiec: { name: 'Kontenerowiec',     parts: [[6, 2], [5.2, 4.5], [1.8, 7], [0.4, 8]] },
+    holownik:      { name: 'Holownik',          parts: [[3.6, 1.6], [2.2, 3.4], [0.8, 5]] },
+    prom:          { name: 'Prom',              parts: [[6, 1.8], [5, 4], [2, 5.5], [0.3, 6.5]] },
   };
   const SHIP_APPROACH = 8;   // s – od pojawienia się statku do wpłynięcia pod most
   const SHIP_PASS = 3;       // s – przepływanie przez most (wtedy liczy się kolizja)
