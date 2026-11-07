@@ -1421,10 +1421,10 @@
   }
 
   // Statek widziany od dziobu. scale < 1 – daleko za mostem, > 1 – już przed mostem.
-  function drawShip(shipX, type, scale, alpha, outline) {
+  function drawShip(shipX, type, scale, alpha, outline, bob) {
     const s = S.view.s;
     const spec = SHIPS[type];
-    const water = S.level.water;
+    const water = S.level.water + (bob || 0) * scale;
     const rect = (w, y0, y1) => {
       const [x0, sy0] = W2S(shipX - (w / 2) * scale, water + y0 * scale);
       const [x1, sy1] = W2S(shipX + (w / 2) * scale, water + y1 * scale);
@@ -1447,6 +1447,13 @@
       ctx.globalAlpha = 1;
       return;
     }
+    // piana przy kadłubie
+    const hullW = spec.parts[0][0] * scale;
+    const [fx, fy] = W2S(shipX, S.level.water);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.ellipse(fx, fy, (hullW / 2 + 0.5 * scale) * s, Math.max(2, 0.18 * scale * s), 0, 0, Math.PI * 2);
+    ctx.fill();
     let prev = -0.3;
     spec.parts.forEach(([w, h], i) => {
       const [x, y, rw, rh] = rect(w, prev, h);
@@ -1475,12 +1482,28 @@
     ctx.globalAlpha = 1;
   }
 
+  // Statek widziany od dziobu porusza się jednym płynnym ruchem: odległość od mostu (d = 1 to
+  // płaszczyzna mostu) maleje, przy moście statek zwalnia, a za mostem przyspiesza w stronę widza.
   function shipPose() {
     const ship = S.sim.ship;
-    if (ship.state === 'waiting') return { scale: 0.3, alpha: 0.5, front: false };
-    if (ship.state === 'approach') return { scale: 0.3 + 0.7 * (ship.t / DRAW.SHIP_APPROACH), alpha: 0.6 + 0.4 * (ship.t / DRAW.SHIP_APPROACH), front: false };
-    if (ship.state === 'passed') return { scale: 1 + ship.t * 0.5, alpha: Math.max(0, 1 - ship.t / 1.5), front: true };
-    return { scale: 1, alpha: 1, front: false };
+    const A = DRAW.SHIP_APPROACH, Pp = DRAW.SHIP_PASS;
+    const smooth = (k) => k * k * (3 - 2 * k);
+    let d, alpha = 1, front = false;
+    if (ship.state === 'waiting') return null;
+    if (ship.state === 'approach') {
+      const k = Math.min(1, ship.t / A);
+      d = 1 + 2.4 * (1 - k) * (1 - k);
+      alpha = Math.min(1, 0.4 + k * 1.5);
+    } else if (ship.state === 'passing' || ship.state === 'crashed') {
+      d = 1 - 0.12 * smooth(Math.min(1, ship.t / Pp));
+    } else {
+      const k = Math.min(1, ship.t / 1.4);
+      d = 0.88 - 0.42 * k * k;
+      alpha = Math.max(0, 1 - k);
+      front = true;
+    }
+    const bob = Math.sin(performance.now() / 420) * 0.06;
+    return { scale: 1 / d, alpha, front, bob };
   }
 
   function drawBuild() {
@@ -1572,7 +1595,7 @@
   function drawSim() {
     const sim = S.sim, P = sim.particles;
     const pose = sim.ship ? shipPose() : null;
-    if (pose && !pose.front && sim.ship.state !== 'waiting') drawShip(sim.ship.x, sim.ship.type, pose.scale, pose.alpha);
+    if (pose && !pose.front) drawShip(sim.ship.x, sim.ship.type, pose.scale, pose.alpha, false, pose.bob);
     if (sim.seams) {
       for (const sm of sim.seams) {
         const [ax, ay, bx, by] = sim.seamEnds(sm);
@@ -1598,7 +1621,7 @@
       drawVehicle(v.w1, v.w2, v.rot1, v.rot2, v.spec, false, v.team, v.dir);
     }
     drawExplosions();
-    if (pose && pose.front && pose.alpha > 0) drawShip(sim.ship.x, sim.ship.type, pose.scale, pose.alpha);
+    if (pose && pose.front && pose.alpha > 0) drawShip(sim.ship.x, sim.ship.type, pose.scale, pose.alpha, false, pose.bob);
   }
 
   function render() {

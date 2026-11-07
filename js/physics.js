@@ -39,8 +39,8 @@
     holownik:      { name: 'Holownik',          parts: [[3.6, 1.6], [2.2, 3.4], [0.8, 5]] },
     prom:          { name: 'Prom',              parts: [[6, 1.8], [5, 4], [2, 5.5], [0.3, 6.5]] },
   };
-  const SHIP_APPROACH = 8;   // s – od pojawienia się statku do wpłynięcia pod most
-  const SHIP_PASS = 3;       // s – przepływanie przez most (wtedy liczy się kolizja)
+  const SHIP_APPROACH = 6;   // s – od pojawienia się statku do wpłynięcia pod most
+  const SHIP_PASS = 1.5;     // s – przepływanie przez most (wtedy liczy się kolizja)
   const RAISE_TIME = 4;      // s – pełne podniesienie lub opuszczenie skrzydeł
   const RAISE_ANGLE = 85 * Math.PI / 180;
   const SEAM_MAX = 1.05;     // m – szczelina przykrywana płytą najazdową

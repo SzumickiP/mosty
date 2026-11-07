@@ -335,9 +335,9 @@
       hint: 'Po statku jedzie drugie auto – z lewej albo z prawej. Pamiętaj, by opuścić most.' },
 
     // ---------- Rozdział 2: Przeciwwagi ----------
-    { name: 'Pierwsza przeciwwaga', sides: 1, gap: 6, ship: 'jacht', torque: 20, pit: { w: 3, d: 4 }, before: ['car'], after: ['car'],
+    { name: 'Pierwsza przeciwwaga', sides: 1, gap: 6, ship: 'jacht', torque: 30, pit: { w: 3, d: 4 }, before: ['car'], after: ['car'],
       hint: 'Napęd jest za słaby. Przedłuż skrzydło nad studnię za zawiasem i obciąż ogon przeciwwagą.' },
-    { name: 'Słaby silnik', sides: 2, gap: 11, ship: 'barka', torque: 20, pit: { w: 3, d: 4 }, before: ['car'], after: ['car'],
+    { name: 'Słaby silnik', sides: 2, gap: 11, ship: 'barka', torque: 30, pit: { w: 3, d: 4 }, before: ['car'], after: ['car'],
       hint: 'Oba skrzydła potrzebują przeciwwag – jezdnia nad studnią też musi utrzymać auto.' },
     { name: 'Ciężkie skrzydło', sides: 1, gap: 7, yB: 7, ship: 'zaglowiec', torque: 75, pit: { w: 4, d: 5 }, before: ['car'], after: ['car'],
       hint: 'Długie skrzydło i wysoki maszt. Równowaga jest ważniejsza niż siła napędu.' },
@@ -417,7 +417,7 @@
       hint: 'Dwie cysterny: przed barką i po niej.' },
     { name: 'Wielki prom', sides: 2, approach: 8, gap: 17, ship: 'prom', before: ['van', 'van'], after: ['truck'],
       hint: 'Najszerszy kanał z filarami.' },
-    { name: 'Nabrzeże portowe', sides: 2, gap: 17, ship: 'kontenerowiec', torque: 100, pit: { w: 3, d: 4 }, pylon: { dx: 4, h: 9 }, before: ['truck', 'van'], after: ['truck'],
+    { name: 'Nabrzeże portowe', sides: 2, gap: 17, ship: 'kontenerowiec', torque: 130, pit: { w: 3, d: 4 }, pylon: { dx: 4, h: 9 }, before: ['truck', 'van'], after: ['truck'],
       hint: 'Słaby napęd, długie skrzydła i ciężarówki – wszystko naraz.' },
     { name: 'Wielki port', sides: 2, approach: 6, gap: 17, yL: 8, yR: 9, ship: 'zaglowiec', before: ['car', 'van', 'truck', 'van'], after: ['truck'],
       hint: 'Wielki finał: filary, różne brzegi, cztery pojazdy i żaglowiec.' },
