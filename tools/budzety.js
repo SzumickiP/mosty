@@ -17,6 +17,7 @@ require(path.join(ROOT, 'js/levels.js'));
 const { Sim, MATERIALS, Geo } = globalThis.Physics;
 const LEVELS = globalThis.LEVELS;
 const MIL_LEVELS = globalThis.MIL_LEVELS;
+const DRAW_LEVELS = globalThis.DRAW_LEVELS;
 
 const BUDGET_FACTOR = 1.15;   // budżet = koszt mostu wzorcowego × współczynnik
 const SAFETY = 0.92;          // most wzorcowy nie może przekroczyć 92% wytrzymałości
@@ -202,7 +203,83 @@ function candidate(level, opt) {
   return beams;
 }
 
+// ---------- Mosty zwodzone ----------
+// Skrzydło: jezdnia od zawiasu do końca skrzydła + kratownica z pasem dolnym (h) i/lub górnym (a)
+function drawCandidate(level, opt) {
+  const beams = [];
+  const seen = new Set();
+  const add = (a, b, type) => {
+    const id = [k(a), k(b)].sort().join('|');
+    if (seen.has(id)) return;
+    seen.add(id);
+    beams.push({ a, b, type });
+  };
+  const gap = level.spec.gap;
+  const xR = level.motors[0].x + gap;
+  for (const m of level.motors) {
+    const d = m.dir;
+    const tipX = level.spec.sides === 2 ? m.x + d * (gap - 1) / 2 : xR - 1;
+    const xs = [];
+    for (let x = m.x; d > 0 ? x < tipX : x > tipX; x += d * opt.step) xs.push(x);
+    xs.push(tipX);
+    const deck = xs.map(x => [x, m.y]);
+    for (let i = 0; i < deck.length - 1; i++) add(deck[i], deck[i + 1], 'road');
+    for (const [off, on] of [[-opt.h, opt.h > 0], [opt.a, opt.a > 0]]) {
+      if (!on) continue;
+      const chord = deck.map(([x, y]) => [x, y + off]);
+      for (let i = 1; i < deck.length; i++) {
+        add(deck[i], chord[i], 'steel');
+        add(deck[i - 1], chord[i], 'steel');
+        if (i > 1) { add(chord[i - 1], deck[i], 'steel'); add(chord[i - 1], chord[i], 'steel'); }
+      }
+    }
+  }
+  for (const b of beams) if (Geo.checkBeam(level, b.a, b.b, b.type)) return null;
+  return beams;
+}
+
+// Scenariusz: most podnosi się, gdy nadpływa statek, i opada, gdy statek przepłynie.
+// Ostatni pojazd może nadjechać z dowolnej strony, więc sprawdzamy oba kierunki.
+function drawSimulate(level, beams) {
+  let maxStress = 0;
+  for (const afterDir of [1, -1]) {
+    const r = drawSimulateDir(level, beams, afterDir);
+    if (!r.win) return { win: false, reason: (afterDir > 0 ? 'z lewej: ' : 'z prawej: ') + r.reason };
+    maxStress = Math.max(maxStress, r.maxStress);
+  }
+  return { win: true, maxStress };
+}
+
+function drawSimulateDir(level, beams, afterDir) {
+  const sim = new Sim(level, { beams }, { afterDir });
+  let maxStress = 0;
+  for (let f = 0; f < 60 * 150; f++) {
+    if (sim.ship.state === 'approach') sim.raiseTarget = 1;
+    if (sim.ship.state === 'passed') sim.raiseTarget = 0;
+    sim.step(DT);
+    if (sim.brokenCount) return { win: false, reason: 'pękło' };
+    maxStress = Math.max(maxStress, stressOf(sim));
+    const r = sim.result();
+    if (r) return r.win ? { win: true, maxStress } : { win: false, reason: r.msg };
+  }
+  return { win: false, reason: 'czas' };
+}
+
 function allCandidates(level) {
+  if (level.drawbridge) {
+    const cands = [];
+    for (const step of [1, 2, 3]) {
+      for (const h of [0, 1, 2, 3]) {
+        for (const a of [0, 1, 2, 3]) {
+          if (!h && !a) continue;
+          const opt = { kind: 'skrzydło', step, side: h ? 'below' : 'above', h, a, links: 0 };
+          const beams = drawCandidate(level, opt);
+          if (beams) cands.push({ opt, beams, cost: Geo.designCost(beams) });
+        }
+      }
+    }
+    return cands.sort((a, b) => a.cost - b.cost);
+  }
   const cands = [];
   for (const kind of ['warren', 'pratt']) {
     for (const step of [2, 3, 4]) {
@@ -225,6 +302,12 @@ function solve(level) {
   let tested = 0;
   for (const c of cands) {
     tested++;
+    if (level.drawbridge) {
+      const r = drawSimulate(level, c.beams);
+      if (r.win && r.maxStress <= SAFETY) return { ...c, maxStress: r.maxStress, tested, total: cands.length };
+      if (process.env.DEBUG) console.log('   ', JSON.stringify(c.opt), c.cost, r.win ? 'naprężenie ' + r.maxStress.toFixed(2) : r.reason);
+      continue;
+    }
     if (level.military) {
       const crossed = alliesCross(level, c.beams);
       if (!crossed) continue;
@@ -260,7 +343,8 @@ function main() {
         budgets[i] = budget;
         const o = r.opt;
         const extra = r.charges ? `, ładunki ${r.charges.length}/${lv.charges}` : '';
-        console.log(`${num}. ${lv.name.padEnd(22)} budżet ${String(budget).padStart(6)}  wzorzec ${r.cost} (${o.kind}, krok ${o.step}, ${o.side === 'above' ? 'nad' : 'pod'}, h${o.h}, kotwy ${o.links}, naprężenie ${(r.maxStress * 100).toFixed(0)}%${extra})  [${r.tested}/${r.total}]`);
+        const shape = lv.drawbridge ? `skrzydło, krok ${o.step}, dół ${o.h}, góra ${o.a}` : `${o.kind}, krok ${o.step}, ${o.side === 'above' ? 'nad' : 'pod'}, h${o.h}, kotwy ${o.links}`;
+        console.log(`${num}. ${lv.name.padEnd(22)} budżet ${String(budget).padStart(6)}  wzorzec ${r.cost} (${shape}, naprężenie ${(r.maxStress * 100).toFixed(0)}%${extra})  [${r.tested}/${r.total}]`);
       } else {
         failed++;
         console.log(`${num}. ${lv.name.padEnd(22)} BRAK ROZWIĄZANIA (${r.total} wariantów)`);
@@ -271,11 +355,12 @@ function main() {
 
   const civil = run(LEVELS, '', 'Wersja cywilna');
   const military = run(MIL_LEVELS, 'm', 'Wersja militarna');
+  const draw = run(DRAW_LEVELS, 'z', 'Wersja z mostami zwodzonymi');
 
   if (!only) {
     if (failed) { console.log(`\n${failed} plansz bez rozwiązania – nie zapisuję budżetów.`); process.exit(1); }
     const out = `// Plik generowany przez tools/budzety.js – nie edytuj ręcznie.\n` +
-      `(function (g) {\n  g.LEVEL_BUDGETS = ${JSON.stringify(civil)};\n  g.MIL_BUDGETS = ${JSON.stringify(military)};\n})(typeof window !== 'undefined' ? window : globalThis);\n`;
+      `(function (g) {\n  g.LEVEL_BUDGETS = ${JSON.stringify(civil)};\n  g.MIL_BUDGETS = ${JSON.stringify(military)};\n  g.DRAW_BUDGETS = ${JSON.stringify(draw)};\n})(typeof window !== 'undefined' ? window : globalThis);\n`;
     fs.writeFileSync(path.join(ROOT, 'js/budgets.js'), out);
     console.log('\nZapisano js/budgets.js');
   }

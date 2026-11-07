@@ -24,6 +24,22 @@
     tank:   { name: 'Czołg',       style: 'tank',   wheelbase: 3.4, height: 1.2, r: 0.55, massWheel: 750, massTop: 450, speed: 2.8, accel: 7 },
   };
 
+  // Statki w mostach zwodzonych. parts: [szerokość, wysokość nad wodą] kolejnych brył
+  // (kadłub, nadbudówka, maszt) – razem tworzą obrys, który musi się zmieścić pod mostem.
+  const SHIPS = {
+    jacht:         { name: 'Jacht',             parts: [[3.2, 1.3], [1.8, 2.4], [0.3, 6]] },
+    barka:         { name: 'Barka',             parts: [[4.5, 1.5], [1.6, 3.0], [0.3, 4.5]] },
+    statek:        { name: 'Statek pasażerski', parts: [[5, 1.8], [3.6, 4.2], [1.2, 5.6], [0.3, 7]] },
+    zaglowiec:     { name: 'Żaglowiec',         parts: [[3.4, 1.5], [2.6, 8.5], [0.35, 10]] },
+    kontenerowiec: { name: 'Kontenerowiec',     parts: [[6, 2], [5.2, 4.5], [1.8, 7], [0.4, 8]] },
+  };
+  const SHIP_APPROACH = 8;   // s – od pojawienia się statku do wpłynięcia pod most
+  const SHIP_PASS = 3;       // s – przepływanie przez most (wtedy liczy się kolizja)
+  const RAISE_TIME = 4;      // s – pełne podniesienie lub opuszczenie skrzydeł
+  const RAISE_ANGLE = 85 * Math.PI / 180;
+  const MOTOR_TORQUE = 600000; // N·m – maksymalny moment napędu zawiasu
+  const SEAM_MAX = 1.05;     // m – szczelina przykrywana płytą najazdową
+
   const SUBSTEPS = 40;
   const JOINT_MASS = 6;
   const BREAK_TAU = 0.04; // s – wygładzanie siły przed sprawdzeniem zerwania
@@ -33,8 +49,10 @@
   const key = (x, y) => x + ',' + y;
 
   class Sim {
-    constructor(level, design) {
+    // opts.afterDir: 1 – pojazd po statku jedzie w prawo, -1 – w lewo (mosty zwodzone)
+    constructor(level, design, opts) {
       this.level = level;
+      this.opts = opts || {};
       this.particles = [];
       this.constraints = [];
       this.time = 0;
@@ -81,13 +99,121 @@
       }
 
       // Kolumna pojazdów. Tryb cywilny: jeden pojazd.
-      const convoy = level.convoy || [{ type: level.vehicle || 'car', team: 'civil' }];
+      const convoy = (level.convoy || [{ type: level.vehicle || 'car', team: 'civil' }])
+        .map(c => (c.after && this.opts.afterDir ? Object.assign({}, c, { dir: this.opts.afterDir }) : c));
       this.vehicles = convoy.map((c, i) => ({
         idx: i, type: c.type, team: c.team, spec: VEHICLES[c.type], state: 'waiting',
         parts: null, w1: null, w2: null, rot1: 0, rot2: 0, stillTime: 0,
-        crossed: false, fell: false, target: VEHICLES[c.type].speed,
+        crossed: false, fell: false, target: VEHICLES[c.type].speed, after: !!c.after, dir: c.dir || 1,
       }));
+      if (level.drawbridge) this.initDrawbridge();
       this.spawnVehicles();
+    }
+
+    // Most zwodzony: ramiona napędów, płyty najazdowe nad szczelinami i statek
+    initDrawbridge() {
+      const lv = this.level, P = this.particles;
+      this.raise = 0;
+      this.raiseTarget = 0;
+      this.motors = [];
+      for (const m of lv.motors) {
+        const idx = P.findIndex(p => p.key === key(m.x, m.y));
+        const arms = [];
+        if (idx >= 0) {
+          for (const c of this.constraints) {
+            if (!c.beam || (c.a !== idx && c.b !== idx)) continue;
+            const pi = c.a === idx ? c.b : c.a;
+            arms.push({ c, pi, th0: Math.atan2(P[pi].y - m.y, P[pi].x - m.x) });
+          }
+        }
+        this.motors.push({ x: m.x, y: m.y, dir: m.dir, arms, load: 0 });
+      }
+
+      // Płyty najazdowe: końce jezdni oddalone o ok. 1 m od innego końca jezdni lub krawędzi brzegu
+      const deg = new Map();
+      for (const c of this.constraints) {
+        if (c.type !== 'road') continue;
+        deg.set(c.a, (deg.get(c.a) || 0) + 1);
+        deg.set(c.b, (deg.get(c.b) || 0) + 1);
+      }
+      const ends = [...deg].filter(([i, d]) => d === 1 && !P[i].fixed).map(([i]) => i);
+      const linked = (i, j) => this.constraints.some(c => (c.a === i && c.b === j) || (c.a === j && c.b === i));
+      this.seams = [];
+      for (let i = 0; i < ends.length; i++) {
+        for (let j = i + 1; j < ends.length; j++) {
+          const a = P[ends[i]], b = P[ends[j]];
+          if (Math.hypot(a.x - b.x, a.y - b.y) <= SEAM_MAX && !linked(ends[i], ends[j])) this.seams.push({ a: ends[i], b: ends[j] });
+        }
+        for (const sp of lv.seamPoints || []) {
+          const a = P[ends[i]];
+          if (Math.hypot(a.x - sp[0], a.y - sp[1]) <= SEAM_MAX) this.seams.push({ a: ends[i], sx: sp[0], sy: sp[1] });
+        }
+      }
+
+      const ship = SHIPS[lv.ship];
+      this.ship = {
+        type: lv.ship, spec: ship, state: 'waiting', t: 0, x: lv.shipX,
+        rects: ship.parts.map(([w, h]) => ({ x0: lv.shipX - w / 2, x1: lv.shipX + w / 2, y0: lv.water - 0.3, y1: lv.water + h })),
+      };
+    }
+
+    seamEnds(sm) {
+      const P = this.particles;
+      const a = P[sm.a];
+      const b = sm.b != null ? P[sm.b] : null;
+      return [a.x, a.y, b ? b.x : sm.sx, b ? b.y : sm.sy, a, b];
+    }
+
+    updateShip(dt) {
+      const ship = this.ship;
+      if (ship.state === 'waiting') {
+        if (this.vehicles.filter(v => !v.after).every(v => v.crossed)) { ship.state = 'approach'; ship.t = 0; }
+        return;
+      }
+      ship.t += dt;
+      if (ship.state === 'approach' && ship.t >= SHIP_APPROACH) { ship.state = 'passing'; ship.t = 0; }
+      else if (ship.state === 'passing') {
+        if (this.shipHits()) { ship.state = 'crashed'; ship.t = 0; }
+        else if (ship.t >= SHIP_PASS) { ship.state = 'passed'; ship.t = 0; }
+      }
+    }
+
+    // Czy jakikolwiek element mostu wchodzi w obrys statku
+    shipHits() {
+      const P = this.particles;
+      for (const c of this.constraints) {
+        if (c.broken || c.type === 'car') continue;
+        const a = P[c.a], b = P[c.b];
+        for (const r of this.ship.rects) if (segRect(a.x, a.y, b.x, b.y, r, 0.12)) return true;
+      }
+      return false;
+    }
+
+    // Napęd zawiasu obraca ramiona skrzydła do zadanego kąta (z ograniczonym momentem)
+    solveMotors(h) {
+      const P = this.particles;
+      const t = this.raise;
+      const ang = RAISE_ANGLE * t * t * (3 - 2 * t);
+      for (const m of this.motors) {
+        let load = 0;
+        const n = m.arms.filter(a => !a.c.broken).length || 1;
+        for (const arm of m.arms) {
+          if (arm.c.broken) continue;
+          const p = P[arm.pi];
+          if (p.w === 0) continue;
+          const dx = p.x - m.x, dy = p.y - m.y;
+          const r = Math.hypot(dx, dy) || 1e-9;
+          let dth = arm.th0 + m.dir * ang - Math.atan2(dy, dx);
+          dth = Math.atan2(Math.sin(dth), Math.cos(dth));
+          const maxS = (MOTOR_TORQUE / r / n) * h * h * p.w;
+          let sArc = dth * r;
+          if (Math.abs(sArc) > maxS) { sArc = Math.sign(sArc) * maxS; load = 1; }
+          else load = Math.max(load, Math.abs(sArc) / maxS);
+          p.x += (-dy / r) * sArc;
+          p.y += (dx / r) * sArc;
+        }
+        m.load = load;
+      }
     }
 
     // Zgodność ze starszym kodem: pierwszy pojazd
@@ -102,11 +228,11 @@
 
     // Pojazd: 2 koła + 2 punkty nadwozia, sztywny czworobok z przekątnymi
     placeVehicle(v, sx, sy) {
-      const s = v.spec;
+      const s = v.spec, d = v.dir;
       const w1 = this.addParticle(sx, sy + s.r, s.massWheel, s.r);
-      const w2 = this.addParticle(sx + s.wheelbase, sy + s.r, s.massWheel, s.r);
-      const t1 = this.addParticle(sx + 0.2, sy + s.r + s.height, s.massTop);
-      const t2 = this.addParticle(sx + s.wheelbase - 0.2, sy + s.r + s.height, s.massTop);
+      const w2 = this.addParticle(sx + d * s.wheelbase, sy + s.r, s.massWheel, s.r);
+      const t1 = this.addParticle(sx + d * 0.2, sy + s.r + s.height, s.massTop);
+      const t2 = this.addParticle(sx + d * (s.wheelbase - 0.2), sy + s.r + s.height, s.massTop);
       const parts = [w1, w2, t1, t2];
       const ids = parts.map(p => this.particles.indexOf(p));
       for (let i = 0; i < 4; i++) {
@@ -129,16 +255,19 @@
         if (v.state !== 'waiting') continue;
         const prev = this.vehicles[v.idx - 1];
         if (prev && prev.state === 'waiting') return;
+        if (v.after && (!this.ship || this.ship.state !== 'passed' || this.raise > 0.02)) return;
         const enemy = v.team === 'enemy';
         if (enemy && prev && prev.team !== 'enemy') {
           if (!prev.w2 || prev.w2.x < lv.enemyTrigger) return;
         }
-        const sx = enemy ? lv.enemyStart : lv.start.x;
-        const clear = this.vehicles.every(o => o.state !== 'active' || o.fell ||
-          Math.min(o.w1.x, o.w2.x) - o.spec.r > sx + v.spec.wheelbase + v.spec.r + 2.5 ||
-          Math.max(o.w1.x, o.w2.x) < sx - 3);
+        const back = v.dir < 0;
+        const sx = back ? lv.startR.x : enemy ? lv.enemyStart : lv.start.x;
+        const clear = this.vehicles.every(o => o.state !== 'active' || o.fell || (back
+          ? Math.min(Math.abs(o.w1.x - sx), Math.abs(o.w2.x - sx)) > v.spec.wheelbase + 4
+          : Math.min(o.w1.x, o.w2.x) - o.spec.r > sx + v.spec.wheelbase + v.spec.r + 2.5 ||
+            Math.max(o.w1.x, o.w2.x) < sx - 3));
         if (!clear) return;
-        this.placeVehicle(v, sx, lv.start.y);
+        this.placeVehicle(v, sx, back ? lv.startR.y : lv.start.y);
       }
     }
 
@@ -150,17 +279,24 @@
       this.time += dt;
 
       const lv = this.level;
+      if (lv.drawbridge) {
+        const rate = dt / RAISE_TIME;
+        this.raise += Math.max(-rate, Math.min(rate, this.raiseTarget - this.raise));
+        this.updateShip(dt);
+      }
       for (const v of this.vehicles) {
         if (v.state !== 'active') continue;
         const r = v.spec.r;
         v.rot1 -= (v.w1.vx * dt) / r;
         v.rot2 -= (v.w2.vx * dt) / r;
         const speed = Math.hypot(v.w1.vx, v.w1.vy);
-        v.stillTime = speed < 0.15 && v.target > 0.5 ? v.stillTime + dt : 0;
+        v.stillTime = speed < 0.15 && Math.abs(v.target) > 0.5 ? v.stillTime + dt : 0;
         if (!v.fell && v.parts.some(p => p.y < lv.water + 0.4)) v.fell = true;
-        if (!v.fell && Math.min(v.w1.x, v.w2.x) > lv.finish) v.crossed = true;
+        // pozycja tylnego koła względem mety w kierunku jazdy
+        const past = v.dir > 0 ? Math.min(v.w1.x, v.w2.x) - lv.finish : lv.finishL - Math.max(v.w1.x, v.w2.x);
+        if (!v.fell && past > 0) v.crossed = true;
         // za metą pojazd zatrzymuje się poza ekranem
-        if (Math.min(v.w1.x, v.w2.x) > lv.finish + 7 || v.parts.every(p => p.dead)) {
+        if (past > 7 || v.parts.every(p => p.dead)) {
           v.state = 'done';
           for (const p of v.parts) { p.w = 0; p.vx = p.vy = 0; }
         }
@@ -171,14 +307,16 @@
     updateTargets() {
       for (const v of this.vehicles) {
         if (v.state !== 'active') continue;
-        const front = Math.max(v.w1.x, v.w2.x) + v.spec.r;
+        const d = v.dir;
+        const front = d > 0 ? Math.max(v.w1.x, v.w2.x) + v.spec.r : Math.min(v.w1.x, v.w2.x) - v.spec.r;
         let gap = Infinity;
         for (const o of this.vehicles) {
-          if (o === v || o.state !== 'active' || o.fell) continue;
-          const rear = Math.min(o.w1.x, o.w2.x) - o.spec.r;
-          if (rear > front - 0.5 && Math.abs(o.w1.y - v.w1.y) < 4) gap = Math.min(gap, rear - front);
+          if (o === v || o.state !== 'active' || o.fell || o.dir !== d) continue;
+          const rear = d > 0 ? Math.min(o.w1.x, o.w2.x) - o.spec.r : Math.max(o.w1.x, o.w2.x) + o.spec.r;
+          const g = d * (rear - front);
+          if (g > -0.5 && Math.abs(o.w1.y - v.w1.y) < 4) gap = Math.min(gap, g);
         }
-        v.target = gap < 1.2 ? 0 : gap < 3 ? v.spec.speed * (gap - 1.2) / 1.8 : v.spec.speed;
+        v.target = d * (gap < 1.2 ? 0 : gap < 3 ? v.spec.speed * (gap - 1.2) / 1.8 : v.spec.speed);
       }
     }
 
@@ -212,6 +350,7 @@
         c.force = -dl * ih2; // > 0 rozciąganie, < 0 ściskanie
       }
 
+      if (this.motors) this.solveMotors(h);
       this.solveContacts();
 
       for (const p of P) {
@@ -258,6 +397,12 @@
             if (c.broken || c.type !== 'road' || c.half) continue;
             const a = P[c.a], b = P[c.b];
             this.contact(wh, a.x, a.y, b.x, b.y, a, b);
+          }
+          if (this.seams) {
+            for (const sm of this.seams) {
+              const [ax, ay, bx, by, pa, pb] = this.seamEnds(sm);
+              if (Math.hypot(ax - bx, ay - by) < 1.4) this.contact(wh, ax, ay, bx, by, pa, pb);
+            }
           }
         }
       }
@@ -306,6 +451,18 @@
     // Wynik próby: null – jeszcze trwa, { win, msg } – koniec
     result() {
       const vs = this.vehicles;
+      if (this.level.drawbridge) {
+        const lost = vs.find(v => v.fell);
+        if (lost) return { win: false, msg: `Pojazd (${lost.spec.name.toLowerCase()}) wpadł do wody.`, reason: 'fell' };
+        if (this.ship.state === 'crashed') return { win: false, msg: `${this.ship.spec.name} uderzył w most.`, reason: 'ship' };
+        if (this.ship.state === 'passed' && this.ship.t > 20 && vs.some(v => v.after && v.state === 'waiting')) {
+          return { win: false, msg: 'Ostatni pojazd nie mógł wjechać – most nie został opuszczony.', reason: 'notLowered' };
+        }
+        if (vs.some(v => !v.crossed && v.stillTime > 3)) return { win: false, msg: 'Pojazd utknął.' };
+        if (vs.every(v => v.crossed) && this.ship.state === 'passed' && this.ship.t > 1) return { win: true };
+        if (this.time > 150) return { win: false, msg: 'Skończył się czas.' };
+        return null;
+      }
       if (!this.level.military) {
         // wszystkie pojazdy (jeden albo konwój) muszą dojechać do flagi
         const lost = vs.find(v => v.fell);
@@ -355,6 +512,21 @@
       }
       return true;
     }
+  }
+
+  // Czy odcinek przecina prostokąt powiększony o margines (algorytm Lianga–Barsky’ego)
+  function segRect(ax, ay, bx, by, r, m) {
+    const x0 = r.x0 - m, x1 = r.x1 + m, y0 = r.y0 - m, y1 = r.y1 + m;
+    let t0 = 0, t1 = 1;
+    const dx = bx - ax, dy = by - ay;
+    const clip = (p, q) => {
+      if (p === 0) return q >= 0;
+      const t = q / p;
+      if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+      else { if (t < t0) return false; if (t < t1) t1 = t; }
+      return true;
+    };
+    return clip(-dx, ax - x0) && clip(dx, x1 - ax) && clip(-dy, ay - y0) && clip(dy, y1 - ay);
   }
 
   // ---------- Reguły budowy (wspólne dla gry i narzędzi) ----------
@@ -419,5 +591,5 @@
 
   const Geo = { pointInPoly, distToSeg, insideTerrain, isAnchor, inBuildArea, validPoint, crossesTerrain, checkBeam, designCost, samePt };
 
-  global.Physics = { Sim, MATERIALS, VEHICLES, key, Geo };
+  global.Physics = { Sim, MATERIALS, VEHICLES, SHIPS, key, Geo, DRAW: { SHIP_APPROACH, SHIP_PASS, RAISE_TIME } };
 })(typeof window !== 'undefined' ? window : globalThis);

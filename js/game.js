@@ -1,7 +1,8 @@
 (function () {
   'use strict';
 
-  const { Sim, MATERIALS, VEHICLES, key, Geo } = window.Physics;
+  const { Sim, MATERIALS, VEHICLES, SHIPS, key, Geo } = window.Physics;
+  const DRAW = window.Physics.DRAW;
 
   // Dwie wersje gry: każda ma własne plansze, rozdziały i zapis postępów
   const VARIANTS = {
@@ -11,7 +12,12 @@
     military: {
       name: 'Militarna', levels: window.MIL_LEVELS, chapters: window.MIL_CHAPTERS, prefix: 'mil.',
     },
+    drawbridge: {
+      name: 'Zwodzona', levels: window.DRAW_LEVELS, chapters: window.DRAW_CHAPTERS, prefix: 'draw.',
+    },
   };
+  // litera w kodzie testowym (testc / testm / testz) → wersja gry
+  const CODE_VARIANT = { c: 'civil', m: 'military', z: 'drawbridge' };
 
   const $ = (id) => document.getElementById(id);
   const canvas = $('game');
@@ -222,6 +228,7 @@
     S.variant = id;
     if (currentUser) store.set(userPrefix(currentUser.id) + 'variant', id);
     document.body.classList.toggle('military', id === 'military');
+    document.body.classList.toggle('drawbridge', id === 'drawbridge');
     if (!military() && S.tool === 'charge') S.tool = 'road';
   }
 
@@ -255,7 +262,13 @@
   function setHint() {
     const lv = S.level;
     if (S.mode === 'build') {
-      if (lv.military) {
+      if (lv.drawbridge) {
+        const after = lv.spec.after || [];
+        $('hint').innerHTML =
+          `<b>Cel:</b> przepuść ${vehicleList(lv.spec.before)}, potem podnieś most, by przepłynął ${SHIPS[lv.ship].name.toLowerCase()}` +
+          (after.length ? `, a na koniec opuść go dla: ${vehicleList(after)} – nadjedzie z lewej albo z prawej strony` : '') + `. ${lv.hint}<br>` +
+          `Skrzydło mocuj do <b>zawiasu z napędem</b> (żółte koło). Przerywany obrys pokazuje, ile miejsca potrzebuje statek.`;
+      } else if (lv.military) {
         $('hint').innerHTML =
           `<b>Misja:</b> przeprowadź sojuszników (${vehicleList(lv.spec.allies)}) do flagi, potem wysadź most, ` +
           `zanim przejedzie wróg (${vehicleList(lv.spec.enemies)}). ${lv.hint}<br>` +
@@ -267,7 +280,7 @@
             : `<b>Cel:</b> przeprowadź pojazd (${VEHICLES[lv.vehicle].name.toLowerCase()}) na drugą stronę, do flagi. ${lv.hint}<br>`) +
           `Kliknij węzeł lub <b>czerwoną kotwę</b>, potem punkt siatki. Prawy przycisk – anuluj / usuń.`;
       }
-    } else if (!lv.military) {
+    } else if (!lv.military && !lv.drawbridge) {
       $('hint').innerHTML = `<b>Test:</b> kolory pokazują naprężenie elementów. Spacja – powrót do budowy.`;
     } else {
       updateMissionStatus(true);
@@ -277,7 +290,9 @@
   let lastStatus = '';
   function updateMissionStatus(force) {
     const sim = S.sim;
-    if (!sim || !S.level.military) return;
+    if (!sim) return;
+    if (S.level.drawbridge) { updateDrawStatus(force); return; }
+    if (!S.level.military) return;
     const allies = sim.vehicles.filter(v => v.team === 'ally');
     const enemies = sim.vehicles.filter(v => v.team === 'enemy');
     const crossed = allies.filter(v => v.crossed).length;
@@ -289,6 +304,35 @@
     if (force || html !== lastStatus) { $('hint').innerHTML = html; lastStatus = html; }
   }
 
+  function updateDrawStatus(force) {
+    const sim = S.sim, ship = sim.ship;
+    const crossed = sim.vehicles.filter(v => v.crossed).length;
+    const shipState = {
+      waiting: 'czeka na przejazd pojazdów',
+      approach: `<span class="warn">nadpływa – za ${Math.max(0, Math.ceil(DRAW.SHIP_APPROACH - ship.t))} s</span>`,
+      passing: 'przepływa pod mostem',
+      passed: 'przepłynął',
+      crashed: '<span class="warn">uderzył w most!</span>',
+    }[ship.state];
+    const moving = sim.raise > 0.001 && sim.raise < 0.999;
+    const bridge = moving ? (sim.raiseTarget ? 'podnosi się' : 'opada')
+      : sim.raise >= 0.999 ? 'podniesiony' : 'opuszczony';
+    const last = sim.vehicles.find(v => v.after);
+    const lastInfo = !last ? ''
+      : last.state === 'waiting' && ship.state === 'passed'
+        ? ` · <b>Ostatni pojazd</b> ${last.dir > 0 ? 'z lewej' : 'z prawej'}: <span class="warn">czeka na opuszczenie mostu</span>`
+        : ` · <b>Ostatni pojazd:</b> ${last.dir > 0 ? 'z lewej' : 'z prawej'}`;
+    const html = `<b>Pojazdy:</b> ${crossed} / ${sim.vehicles.length} · <b>${ship.spec.name}:</b> ${shipState} · ` +
+      `<b>Most:</b> ${bridge} – klawisz P: ${sim.raiseTarget ? 'opuść' : 'podnieś'}${lastInfo}`;
+    if (force || html !== lastStatus) { $('hint').innerHTML = html; lastStatus = html; }
+  }
+
+  function toggleRaise() {
+    if (S.mode !== 'test' || !S.sim || !S.level.drawbridge) return;
+    S.sim.raiseTarget = S.sim.raiseTarget ? 0 : 1;
+    updateHud();
+  }
+
   // ---------- Test ----------
   function startTest() {
     if (S.mode === 'test') return;
@@ -296,7 +340,8 @@
     if (military() && !chargeCount()) toast('Nie założyłeś żadnego ładunku – mostu nie da się wysadzić', true);
     S.mode = 'test';
     S.pending = null;
-    S.sim = new Sim(S.level, { beams: S.beams });
+    S.afterDir = Math.random() < 0.5 ? 1 : -1;
+    S.sim = new Sim(S.level, { beams: S.beams }, S.level.drawbridge ? { afterDir: S.afterDir } : undefined);
     S.result = null;
     S.resultShown = false;
     S.acc = 0;
@@ -348,7 +393,11 @@
       const last = S.li === levels.length - 1;
       const costLine = `Koszt: <b>${cost.toLocaleString('pl-PL')} zł</b> z ${S.level.budget.toLocaleString('pl-PL')} zł.
         ${st < 3 ? `Trzy gwiazdki za koszt do ${Math.floor(S.level.budget * 0.7).toLocaleString('pl-PL')} zł.` : 'Wzorowa, oszczędna konstrukcja.'}`;
-      const body = S.level.military
+      const body = S.level.drawbridge
+        ? `<h2>Statek przepłynął!</h2>
+           <div class="big-stars">${starsHtml(st)}</div>
+           <p>Wszystkie pojazdy przejechały, a ${sim.ship.spec.name.toLowerCase()} zmieścił się pod mostem.<br>${costLine}</p>`
+        : S.level.military
         ? `<h2>Misja wykonana!</h2>
            <div class="big-stars">${starsHtml(st)}</div>
            <p>Sojusznicy przejechali, a wróg został zatrzymany.
@@ -365,6 +414,13 @@
         </div>`);
     } else {
       let tip = 'Spójrz, które elementy świecą na czerwono – to one były najbardziej przeciążone. Pamiętaj: trójkąty są sztywne, prostokąty się składają.';
+      if (S.level.drawbridge) {
+        if (r.reason === 'ship') tip = sim.raise < 0.5
+          ? 'Most był opuszczony. Gdy statek nadpływa, naciśnij „Podnieś most” albo klawisz P.'
+          : 'Skrzydło weszło w obrys statku. Sprawdź, czy nie jest połączone z drugim brzegiem lub drugim skrzydłem i czy nie jest za grube.';
+        else if (r.reason === 'notLowered') tip = 'Po przepłynięciu statku opuść most, zanim wjedzie kolejny pojazd.';
+        else if (sim.raise > 0.05 && r.reason === 'fell') tip = 'Most podniósł się, zanim pojazd zjechał. Poczekaj, aż przejadą wszystkie pojazdy.';
+      }
       if (S.level.military) {
         const enemyCrossed = sim.vehicles.some(v => v.team === 'enemy' && v.crossed);
         if (enemyCrossed && !sim.detonated) tip = 'Nie zdetonowałeś ładunków. Gdy ostatni sojusznik zjedzie z mostu, naciśnij „Detonuj” albo klawisz D.';
@@ -372,7 +428,7 @@
         else if (sim.detonated && sim.vehicles.some(v => v.team === 'ally' && v.fell)) tip = 'Wysadziłeś most za wcześnie albo nie wytrzymał przejazdu. Poczekaj, aż wszyscy sojusznicy zjadą z mostu.';
       }
       showPanel('result', `
-        <h2>${S.level.military ? 'Misja nieudana' : 'Most nie wytrzymał'}</h2>
+        <h2>${S.level.military ? 'Misja nieudana' : S.level.drawbridge ? 'Nie tym razem' : 'Most nie wytrzymał'}</h2>
         <p>${r.msg} ${tip}</p>
         <div class="actions">
           <button class="btn" data-act="watch">Oglądaj dalej</button>
@@ -425,6 +481,7 @@
       <div class="modes">
         ${card('civil', '🌉', 'Buduj mosty nad przepaściami dla aut, ciężarówek i cystern. Zmieść się w budżecie i przeprowadź pojazd na drugą stronę.')}
         ${card('military', '🧨', 'Zbuduj przeprawę dla kolumny wojska. Gdy sojusznicy przejadą, wysadź most dynamitem, zanim przejedzie wróg.')}
+        ${card('drawbridge', '⚓', 'Buduj mosty zwodzone z napędem z jednej lub obu stron. Przepuść pojazdy, podnieś most i zmieść statek pod spodem.')}
       </div>`, true);
   }
 
@@ -475,7 +532,7 @@
     S.testMode = false;
     setUser(uid);
     const saved = store.get(userPrefix(uid) + 'variant', 'civil');
-    setVariant(saved === 'military' ? 'military' : 'civil');
+    setVariant(VARIANTS[saved] ? saved : 'civil');
     loadLevel(Math.min(progress().unlocked - 1, store.get(ukey('lastLevel'), 0)));
     showStart();
   }
@@ -564,7 +621,9 @@
       const status = locked ? '🔒 zablokowana'
         : best ? starsHtml(best.stars) + ' ' + best.cost.toLocaleString('pl-PL') + ' zł'
         : 'budżet ' + lv.budget.toLocaleString('pl-PL') + ' zł';
-      const sub = lv.military
+      const sub = lv.drawbridge
+        ? `${SHIPS[lv.ship].name} · ${lv.spec.sides === 2 ? 'dwa skrzydła' : 'jedno skrzydło'}`
+        : lv.military
         ? `${vehicleList(lv.spec.allies)} · 🧨 ${lv.charges}`
         : lv.spec.vehicles ? 'Konwój: ' + vehicleList(lv.spec.vehicles) : VEHICLES[lv.vehicle].name;
       return `<button class="level-card${i === S.li ? ' current' : ''}" data-level="${i}" ${locked ? 'disabled' : ''}>
@@ -664,6 +723,9 @@
     const t = $('btn-test');
     t.textContent = S.mode === 'test' ? '■ Stop' : '▶ Testuj';
     t.classList.toggle('stop', S.mode === 'test');
+    const raise = $('btn-raise');
+    raise.classList.toggle('hidden', !(S.level.drawbridge && S.mode === 'test'));
+    raise.textContent = S.sim && S.sim.raiseTarget ? '⬇ Opuść most' : '⬆ Podnieś most';
     const det = $('btn-detonate');
     det.classList.toggle('hidden', !(military() && S.mode === 'test'));
     det.disabled = !S.sim || S.sim.detonated;
@@ -702,6 +764,7 @@
   document.querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
   $('btn-test').addEventListener('click', () => (S.mode === 'test' ? stopTest() : startTest()));
   $('btn-detonate').addEventListener('click', detonate);
+  $('btn-raise').addEventListener('click', toggleRaise);
   $('btn-undo').addEventListener('click', undo);
   $('btn-clear').addEventListener('click', clearDesign);
   $('btn-menu').addEventListener('click', showMenu);
@@ -773,6 +836,7 @@
       case '4': case 'Delete': setTool('delete'); break;
       case '5': setTool('charge'); break;
       case 'd': case 'D': detonate(); break;
+      case 'p': case 'P': toggleRaise(); break;
       case ' ': e.preventDefault(); S.mode === 'test' ? stopTest() : startTest(); break;
       case 'Escape':
         if (S.panel === 'menu' || S.panel === 'result' || (S.panel === 'scores' && currentUser)) hideOverlay();
@@ -791,13 +855,13 @@
     if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return false;
     cheatBuf = (cheatBuf + e.key.toLowerCase()).slice(-12);
     clearTimeout(cheatTimer);
-    const m = cheatBuf.match(/test([cm])(\d{1,2})$/);
+    const m = cheatBuf.match(/test([cmz])(\d{1,2})$/);
     if (m) {
       // chwila na wpisanie drugiej cyfry
-      cheatTimer = setTimeout(() => { cheatBuf = ''; enterTestMode(m[1] === 'm' ? 'military' : 'civil', +m[2]); }, 700);
+      cheatTimer = setTimeout(() => { cheatBuf = ''; enterTestMode(CODE_VARIANT[m[1]], +m[2]); }, 700);
       return true;
     }
-    return /test[cm]$/.test(cheatBuf); // połknij „c” / „m”, żeby nie otworzyć menu
+    return /test[cmz]$/.test(cheatBuf); // połknij „c” / „m” / „z”, żeby nie otworzyć menu
   }
 
   function enterTestMode(variant, n) {
@@ -848,6 +912,7 @@
   const THEME = {
     civil:    { sky: ['#7fb8e6', '#d6ecf7'], rock: '#7a6551', rockLine: '#4b3b2e', grass: '#5d9a3c', hills: 'rgba(90,120,150,0.25)' },
     military: { sky: ['#8c9aa3', '#d8d0b4'], rock: '#6e6650', rockLine: '#443e2f', grass: '#6b7d3a', hills: 'rgba(80,90,80,0.3)' },
+    drawbridge: { sky: ['#8fc3ea', '#e3f1f9'], rock: '#8a8f96', rockLine: '#565b62', grass: '#9aa0a8', hills: 'rgba(90,120,150,0.22)' },
   };
   const theme = () => THEME[S.variant];
 
@@ -1094,9 +1159,35 @@
     }
   }
 
+  const isMotor = (x, y) => S.level.motors && S.level.motors.some(m => m.x === x && m.y === y);
+
+  // Zawias z napędem: żółte koło zębate obracające się razem ze skrzydłem
+  function drawMotor(x, y, highlight) {
+    const s = S.view.s;
+    const [sx, sy] = W2S(x, y);
+    const m = S.level.motors.find(q => q.x === x && q.y === y);
+    const rot = S.sim ? -m.dir * S.sim.raise * 1.5 : 0;
+    const R = s * 0.42, r = s * 0.3;
+    ctx.beginPath();
+    for (let i = 0; i < 16; i++) {
+      const a = rot + (i * Math.PI) / 8;
+      const rr = i % 2 ? r : R;
+      ctx.lineTo(sx + Math.cos(a) * rr, sy + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#f0c419';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = highlight ? '#ffffff' : '#5c4a06';
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(sx, sy, s * 0.12, 0, Math.PI * 2);
+    ctx.fillStyle = '#5c4a06'; ctx.fill();
+  }
+
   function drawNode(x, y, anchor, highlight) {
     const s = S.view.s;
     const [sx, sy] = W2S(x, y);
+    if (anchor && isMotor(x, y)) { drawMotor(x, y, highlight); return; }
     if (anchor) {
       ctx.fillStyle = '#b8322a';
       ctx.beginPath();
@@ -1115,8 +1206,8 @@
     ctx.stroke();
   }
 
-  function drawFlag() {
-    const x = S.level.finish;
+  function drawFlag(fx) {
+    const x = fx != null ? fx : S.level.finish;
     const gy = groundY(x);
     const s = S.view.s;
     const [sx, sy] = W2S(x, gy);
@@ -1137,11 +1228,12 @@
   };
 
   // Pojazd rysowany w układzie lokalnym: oś X wzdłuż kół, oś Y prostopadle w górę
-  function drawVehicle(w1, w2, rot1, rot2, spec, ghost, team) {
+  function drawVehicle(w1, w2, rot1, rot2, spec, ghost, team, dir) {
     const s = S.view.s;
     const ux = (w2.x - w1.x), uy = (w2.y - w1.y);
     const L = Math.hypot(ux, uy) || 1;
-    const ex = ux / L, ey = uy / L, nx = -ey, ny = ex;
+    const ex = ux / L, ey = uy / L;
+    const nx = dir < 0 ? ey : -ey, ny = dir < 0 ? -ex : ex;
     const P = (lx, ly) => W2S(w1.x + ex * lx + nx * ly, w1.y + ey * lx + ny * ly);
     const wb = spec.wheelbase, r = spec.r, H = spec.height;
     const style = spec.style;
@@ -1238,8 +1330,72 @@
     ctx.globalAlpha = 1;
   }
 
+  // Statek widziany od dziobu. scale < 1 – daleko za mostem, > 1 – już przed mostem.
+  function drawShip(shipX, type, scale, alpha, outline) {
+    const s = S.view.s;
+    const spec = SHIPS[type];
+    const water = S.level.water;
+    const rect = (w, y0, y1) => {
+      const [x0, sy0] = W2S(shipX - (w / 2) * scale, water + y0 * scale);
+      const [x1, sy1] = W2S(shipX + (w / 2) * scale, water + y1 * scale);
+      return [x0, sy1, x1 - x0, sy0 - sy1];
+    };
+    ctx.globalAlpha = alpha;
+    if (outline) {
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = 'rgba(255,220,120,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.fillStyle = 'rgba(255,220,120,0.08)';
+      for (const [w, h] of spec.parts) { const r = rect(w, -0.3, h); ctx.fillRect(...r); ctx.strokeRect(...r); }
+      ctx.setLineDash([]);
+      const maxW = Math.max(...spec.parts.map(q => q[0])), maxH = Math.max(...spec.parts.map(q => q[1]));
+      const [lx, ly] = W2S(shipX, water + maxH + 0.4);
+      ctx.font = '600 12px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = 'rgba(255,220,120,0.95)';
+      ctx.fillText(`${spec.name}: ${maxW} m szer. · ${maxH} m nad wodą`, lx, ly);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    let prev = -0.3;
+    spec.parts.forEach(([w, h], i) => {
+      const [x, y, rw, rh] = rect(w, prev, h);
+      if (i === 0) {
+        ctx.fillStyle = '#1f3b5c'; ctx.fillRect(x, y + rh * 0.55, rw, rh * 0.45);
+        ctx.fillStyle = '#f2f2f2'; ctx.fillRect(x, y, rw, rh * 0.55);
+        ctx.fillStyle = '#c0392b'; ctx.fillRect(x, y + rh * 0.5, rw, Math.max(2, rh * 0.08));
+      } else if (w < 0.5) {
+        ctx.fillStyle = '#5b4636'; ctx.fillRect(x, y, rw, rh);
+        ctx.fillStyle = '#d64545';
+        ctx.beginPath(); ctx.moveTo(x + rw, y); ctx.lineTo(x + rw + s * 0.6 * scale, y + s * 0.2 * scale); ctx.lineTo(x + rw, y + s * 0.4 * scale); ctx.fill();
+      } else if (type === 'zaglowiec') {
+        ctx.fillStyle = '#f7f3e8';
+        ctx.beginPath(); ctx.moveTo(x, y + rh); ctx.quadraticCurveTo(x + rw / 2, y + rh * 0.3, x + rw / 2, y); ctx.quadraticCurveTo(x + rw / 2, y + rh * 0.3, x + rw, y + rh); ctx.closePath(); ctx.fill();
+      } else {
+        ctx.fillStyle = i % 2 ? '#e9ecef' : '#d3d8de'; ctx.fillRect(x, y, rw, rh);
+        if (w >= 1.5) {
+          ctx.fillStyle = '#2d4a66';
+          const n = Math.floor(w / 0.8);
+          for (let k = 0; k < n; k++) ctx.fillRect(x + (k + 0.3) * (rw / n), y + rh * 0.3, (rw / n) * 0.45, rh * 0.25);
+        }
+      }
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, rw, rh);
+      prev = h;
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  function shipPose() {
+    const ship = S.sim.ship;
+    if (ship.state === 'waiting') return { scale: 0.3, alpha: 0.5, front: false };
+    if (ship.state === 'approach') return { scale: 0.3 + 0.7 * (ship.t / DRAW.SHIP_APPROACH), alpha: 0.6 + 0.4 * (ship.t / DRAW.SHIP_APPROACH), front: false };
+    if (ship.state === 'passed') return { scale: 1 + ship.t * 0.5, alpha: Math.max(0, 1 - ship.t / 1.5), front: true };
+    return { scale: 1, alpha: 1, front: false };
+  }
+
   function drawBuild() {
     const s = S.view.s;
+    if (S.level.drawbridge) drawShip(S.level.shipX, S.level.ship, 1, 1, true);
     for (const b of S.beams) if (b.type === 'cable') drawBeam(b.a[0], b.a[1], b.b[0], b.b[1], b.type, null);
     for (const b of S.beams) if (b.type === 'steel') drawBeam(b.a[0], b.a[1], b.b[0], b.b[1], b.type, null);
     for (const b of S.beams) if (b.type === 'road') drawBeam(b.a[0], b.a[1], b.b[0], b.b[1], b.type, null);
@@ -1316,10 +1472,24 @@
     const spec = VEHICLES[S.level.vehicle];
     const st = S.level.start;
     drawVehicle({ x: st.x, y: st.y + spec.r }, { x: st.x + spec.wheelbase, y: st.y + spec.r }, 0, 0, spec, true, S.level.military ? 'ally' : 'civil');
+    if (S.level.drawbridge && S.level.spec.after) {
+      const ls = VEHICLES[S.level.spec.after[0]], sr = S.level.startR;
+      drawVehicle({ x: sr.x, y: sr.y + ls.r }, { x: sr.x - ls.wheelbase, y: sr.y + ls.r }, 0, 0, ls, true, 'civil', -1);
+    }
   }
 
   function drawSim() {
     const sim = S.sim, P = sim.particles;
+    const pose = sim.ship ? shipPose() : null;
+    if (pose && !pose.front && sim.ship.state !== 'waiting') drawShip(sim.ship.x, sim.ship.type, pose.scale, pose.alpha);
+    if (sim.seams) {
+      for (const sm of sim.seams) {
+        const [ax, ay, bx, by] = sim.seamEnds(sm);
+        if (Math.hypot(ax - bx, ay - by) >= 1.4) continue;
+        beamPath(ax, ay, bx, by);
+        ctx.strokeStyle = '#6b7078'; ctx.lineWidth = S.view.s * 0.16; ctx.lineCap = 'round'; ctx.stroke(); ctx.lineCap = 'butt';
+      }
+    }
     const order = { cable: 0, steel: 1, road: 2 };
     const list = sim.constraints.filter(c => c.type !== 'car' && !c.broken).sort((a, b) => order[a.type] - order[b.type]);
     for (const c of list) {
@@ -1334,9 +1504,10 @@
     for (const c of sim.constraints) if (c.charge && !c.broken) drawCharge(P[c.a].x, P[c.a].y, P[c.b].x, P[c.b].y);
     for (const v of sim.vehicles) {
       if (v.state === 'waiting') continue;
-      drawVehicle(v.w1, v.w2, v.rot1, v.rot2, v.spec, false, v.team);
+      drawVehicle(v.w1, v.w2, v.rot1, v.rot2, v.spec, false, v.team, v.dir);
     }
     drawExplosions();
+    if (pose && pose.front && pose.alpha > 0) drawShip(sim.ship.x, sim.ship.type, pose.scale, pose.alpha);
   }
 
   function render() {
@@ -1354,6 +1525,7 @@
         drawGrid(w, h);
       }
       drawFlag();
+      if (S.level.drawbridge && S.sim && S.sim.vehicles.some(v => v.dir < 0)) drawFlag(S.level.finishL);
       if (S.mode === 'build') drawBuild();
       else drawSim();
     }
@@ -1384,14 +1556,14 @@
   $('btn-user').addEventListener('click', () => showUsers());
   setUser(store.get('mosty2.currentUser', null));
   const savedVariant = currentUser ? store.get(userPrefix(currentUser.id) + 'variant', 'civil') : 'civil';
-  setVariant(savedVariant === 'military' ? 'military' : 'civil');
+  setVariant(VARIANTS[savedVariant] ? savedVariant : 'civil');
   resize();
   loadLevel(Math.min(progress().unlocked - 1, store.get(ukey('lastLevel'), 0)));
   showStart();
   // Link z kodem testowym, np. index.html#testm5 albo index.html?testc12
   function testFromUrl() {
-    const m = (location.hash + location.search).toLowerCase().match(/test([cm])(\d{1,2})/);
-    if (m) enterTestMode(m[1] === 'm' ? 'military' : 'civil', +m[2]);
+    const m = (location.hash + location.search).toLowerCase().match(/test([cmz])(\d{1,2})/);
+    if (m) enterTestMode(CODE_VARIANT[m[1]], +m[2]);
   }
   testFromUrl();
   window.addEventListener('hashchange', testFromUrl);

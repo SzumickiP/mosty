@@ -318,3 +318,9 @@ body.testing #tools { display: none; }
 }
 .test-banner .btn { background: rgba(255,255,255,.15); border-color: rgba(255,255,255,.4); color: #fff; }
 .test-note { color: #c4a5ff !important; font-weight: 600; }
+
+/* ---------- Mosty zwodzone ---------- */
+.btn-raise { background: #f0c419; border-color: #f0c419; color: #2b2205; font-weight: 700; }
+.btn-raise:hover { background: #ffd84a; }
+body.drawbridge #level-num { color: #f0c419; }
+.mode-drawbridge { background: linear-gradient(160deg, #1d4a5a, #1d2c3c 60%); }

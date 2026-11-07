@@ -304,8 +304,103 @@
       hint: 'Ostatnia misja. Pięć pojazdów musi przejść – trzy nie mogą.' },
   ];
 
+  // ---------- Wersja z mostami zwodzonymi ----------
+  // sides  – 1: skrzydło podnoszone z lewego brzegu, 2: dwa skrzydła z obu brzegów
+  // gap    – szerokość kanału (przy dwóch skrzydłach nieparzysta: między końcami skrzydeł zostaje 1 m)
+  // yB     – wysokość nabrzeży (domyślnie 6)
+  // ship   – statek, który musi przepłynąć (Physics.SHIPS)
+  // before – pojazdy jadące przed statkiem, after – pojazdy jadące po nim (most trzeba opuścić)
+  const DRAW_CHAPTERS = [
+    { name: 'Pierwsze skrzydła', count: 5, desc: 'Przepuść auto, podnieś most, przepuść statek.' },
+    { name: 'Port rzeczny', count: 5, desc: 'Dwa skrzydła, większe statki i ruch w obie strony.' },
+    { name: 'Wielkie statki', count: 5, desc: 'Żaglowce i kontenerowce. Skrzydła muszą być mocne i smukłe.' },
+  ];
+
+  const DRAW_SPECS = [
+    // ---------- Rozdział 1 ----------
+    { name: 'Kładka nad kanałem', sides: 1, gap: 6, ship: 'jacht', before: ['car'], after: ['car'],
+      hint: 'Skrzydło mocuj tylko do zawiasu z napędem. Gdy auto przejedzie, podnieś most.' },
+    { name: 'Przystań', sides: 1, gap: 7, ship: 'barka', before: ['car'], after: ['car'],
+      hint: 'Skrzydło trzyma się tylko zawiasu – zbuduj je z trójkątów, by się nie ugięło.' },
+    { name: 'Dwa skrzydła', sides: 2, gap: 11, ship: 'jacht', before: ['car'], after: ['car'],
+      hint: 'Dwa skrzydła, każde na własnym zawiasie. Nie łącz ich ze sobą.' },
+    { name: 'Barka węglowa', sides: 2, gap: 11, ship: 'barka', before: ['van'], after: ['van'],
+      hint: 'Dostawczak jest cięższy – skrzydła potrzebują głębszej kratownicy.' },
+    { name: 'Tam i z powrotem', sides: 1, gap: 7, ship: 'jacht', before: ['car'], after: ['car'],
+      hint: 'Po statku jedzie drugie auto. Pamiętaj, by opuścić most.' },
+
+    // ---------- Rozdział 2 ----------
+    { name: 'Port rzeczny', sides: 2, gap: 13, ship: 'statek', before: ['car', 'car'], after: ['car'],
+      hint: 'Statek pasażerski jest szeroki. Zostaw mu miejsce między skrzydłami.' },
+    { name: 'Wąski kanał', sides: 1, gap: 8, yB: 7, ship: 'zaglowiec', before: ['van'], after: ['van'],
+      hint: 'Żaglowiec ma maszt wysoki na 10 metrów.' },
+    { name: 'Nabrzeże', sides: 2, gap: 13, yB: 7, ship: 'barka', before: ['van'], after: ['car'],
+      hint: 'Dostawczak przed barką, auto po niej.' },
+    { name: 'Ciężki ładunek', sides: 2, gap: 11, ship: 'jacht', before: ['truck'], after: ['truck'],
+      hint: 'Ciężarówka na wspornikach. Skrzydła muszą być bardzo sztywne.' },
+    { name: 'Godziny szczytu', sides: 2, gap: 13, ship: 'statek', before: ['car', 'van'], after: ['car'],
+      hint: 'Trzy pojazdy i statek. Licz, kto już przejechał.' },
+
+    // ---------- Rozdział 3 ----------
+    { name: 'Żaglowiec', sides: 2, gap: 13, yB: 7, ship: 'zaglowiec', before: ['van'], after: ['van'],
+      hint: 'Wysoki maszt – skrzydła muszą stanąć prawie pionowo.' },
+    { name: 'Most portowy', sides: 2, gap: 15, ship: 'statek', before: ['van'], after: ['car'],
+      hint: 'Dłuższe skrzydła to większy moment na zawiasach.' },
+    { name: 'Jedno skrzydło', sides: 1, gap: 8, yB: 7, ship: 'statek', before: ['van'], after: ['van'],
+      hint: 'Szeroki statek i tylko jedno skrzydło.' },
+    { name: 'Kontenerowiec', sides: 2, gap: 15, ship: 'kontenerowiec', before: ['truck'], after: ['truck'],
+      hint: 'Największy statek w porcie. Skrzydła nie mogą być grube.' },
+    { name: 'Wielkie otwarcie', sides: 2, gap: 17, yB: 8, ship: 'zaglowiec', before: ['car', 'van', 'truck'], after: ['van'],
+      hint: 'Finał: trzy pojazdy, żaglowiec i jeszcze jeden pojazd na koniec.' },
+  ];
+
+  function buildDraw(spec, i, opts) {
+    const xL = X_LEFT, gap = spec.gap, xR = xL + gap;
+    const yB = spec.yB != null ? spec.yB : 6;
+    const water = 1.2;
+    const two = spec.sides === 2;
+    const leaf = two ? (gap - 1) / 2 : gap - 1;
+    const ship = global.Physics.SHIPS[spec.ship];
+    const shipTop = Math.max(...ship.parts.map(pt => pt[1]));
+    const top = Math.ceil(Math.max(yB + 8, water + shipTop + 2, yB + leaf + 2));
+    const motors = [{ x: xL, y: yB, dir: 1 }];
+    if (two) motors.push({ x: xR, y: yB, dir: -1 });
+    const budgets = opts.budgets || [];
+    return {
+      name: spec.name,
+      hint: spec.hint,
+      chapter: chapterOf(i, opts.chapters),
+      view: { x0: 0, x1: xR + 8, y0: 0, y1: top },
+      build: { x0: 1, x1: xR + 7, y0: 1, y1: top - 1 },
+      terrain: [
+        [[FAR_L, BOTTOM], [xL, BOTTOM], [xL, yB], [FAR_L, yB]],
+        [[xR, yB], [xR, BOTTOM], [FAR_R, BOTTOM], [FAR_R, yB]],
+      ],
+      water,
+      anchors: motors.map(m => [m.x, m.y]),
+      motors,
+      seamPoints: two ? [] : [[xR, yB]],
+      ship: spec.ship,
+      shipX: two ? (xL + xR) / 2 : (xL + xR) / 2 + 1,
+      start: { x: xL - 6, y: yB },
+      finish: xR + 4,
+      startR: { x: xR + 6, y: yB },   // start pojazdu jadącego w lewo
+      finishL: xL - 4,                // meta pojazdu jadącego w lewo
+      budget: spec.budget || budgets[i] || 99999,
+      vehicle: spec.before[0],
+      convoy: [
+        ...spec.before.map(type => ({ type, team: 'civil' })),
+        ...(spec.after || []).map(type => ({ type, team: 'civil', after: true })),
+      ],
+      drawbridge: true,
+      spec,
+    };
+  }
+
   global.LEVELS = SPECS.map((s, i) => build(s, i, { budgets: global.LEVEL_BUDGETS, chapters: CHAPTERS }));
   global.CHAPTERS = CHAPTERS;
   global.MIL_LEVELS = MIL_SPECS.map((s, i) => build(s, i, { budgets: global.MIL_BUDGETS, chapters: MIL_CHAPTERS, military: true }));
   global.MIL_CHAPTERS = MIL_CHAPTERS;
+  global.DRAW_LEVELS = DRAW_SPECS.map((s, i) => buildDraw(s, i, { budgets: global.DRAW_BUDGETS, chapters: DRAW_CHAPTERS }));
+  global.DRAW_CHAPTERS = DRAW_CHAPTERS;
 })(typeof window !== 'undefined' ? window : globalThis);

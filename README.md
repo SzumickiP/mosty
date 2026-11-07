@@ -21,6 +21,7 @@ Otwórz `index.html` w przeglądarce. Nie trzeba niczego instalować ani budowa�
 | Cofnij | `Ctrl+Z` |
 | Dynamit (wersja militarna) | `5`, potem kliknij belkę lub linę |
 | Detonacja (w trakcie testu) | `D` albo przycisk „Detonuj” |
+| Podnieś / opuść most zwodzony (w trakcie testu) | `P` albo przycisk „Podnieś most” |
 | Menu plansz | `M` |
 
 ## Gracze i tabela wyników
@@ -52,7 +53,16 @@ zanim przejedzie wróg. Na każdej planszy jest inna liczba ładunków dynamitu;
 na belki i liny (nie na jezdnię). Misja jest zaliczona, gdy wszyscy sojusznicy dojadą do flagi,
 a żaden wróg nie przejedzie – wróg może wpaść do przepaści razem z mostem albo zatrzymać się przed wyrwą.
 
-W obu wersjach kolejna plansza odblokowuje się po przejściu poprzedniej.
+**Zwodzona** – 15 plansz w trzech rozdziałach: **Pierwsze skrzydła**, **Port rzeczny** i **Wielkie statki**.
+Na nabrzeżu jest zawias z napędem (żółte koło zębate) – z jednej albo z obu stron kanału. Skrzydło mostu
+buduje się tylko na zawiasie i nie łączy z drugim brzegiem. W teście najpierw przejeżdżają pojazdy, potem
+nadpływa statek: trzeba podnieść most (przycisk lub klawisz `P`), a statek musi zmieścić się między
+skrzydłami – jego obrys widać w trybie budowy. Po przepłynięciu statku trzeba most opuścić: na każdej
+planszy jedzie jeszcze jeden pojazd, a przy każdym teście losowane jest, czy nadjedzie z lewej, czy z prawej
+strony – most musi więc działać w obu kierunkach. Pojazd czeka przed mostem, aż ten zostanie całkowicie
+opuszczony; jeśli most nie opadnie w ciągu 20 sekund, plansza jest przegrana.
+
+We wszystkich wersjach kolejna plansza odblokowuje się po przejściu poprzedniej.
 Gwiazdki: 1 za przejście, 2 za koszt do 85% budżetu, 3 za koszt do 70% budżetu.
 
 ## Struktura
@@ -67,7 +77,7 @@ Gwiazdki: 1 za przejście, 2 za koszt do 85% budżetu, 3 za koszt do 70% budżet
 
 ## Dodawanie lub zmiana planszy
 
-1. Dopisz lub zmień wpis w tablicy `SPECS` (cywilne) albo `MIL_SPECS` (militarne) w `js/levels.js`.
+1. Dopisz lub zmień wpis w tablicy `SPECS` (cywilne), `MIL_SPECS` (militarne) albo `DRAW_SPECS` (zwodzone) w `js/levels.js`.
 2. Uruchom `node tools/budzety.js` – narzędzie sprawdzi, czy każdą planszę da się przejść,
-   i zapisze nowe budżety do `js/budgets.js`. `node tools/budzety.js 12 m3` sprawdza tylko
-   planszę cywilną 12 i militarną 3.
+   i zapisze nowe budżety do `js/budgets.js`. `node tools/budzety.js 12 m3 z5` sprawdza tylko
+   planszę cywilną 12, militarną 3 i zwodzoną 5.
