@@ -7,6 +7,7 @@
 //   wallL, wallR – głębokości kotew na ścianach skał, liczone od krawędzi w dół
 //   pillars – skalne filary: x (parzyste, odległość od lewej krawędzi), top – wysokość szczytu
 //   vehicle – car | van | truck | tanker
+//   vehicles – zamiast vehicle: konwój kilku pojazdów jadących po kolei
 // Budżety liczy narzędzie tools/budzety.js i zapisuje w js/budgets.js.
 (function (global) {
   'use strict';
@@ -14,9 +15,10 @@
   const FAR_L = -60, FAR_R = 120, BOTTOM = -40, X_LEFT = 8;
 
   const CHAPTERS = [
-    { name: 'Podstawy', desc: 'Pierwsze przeprawy. Naucz się, że trójkąt to najlepszy przyjaciel inżyniera.' },
-    { name: 'Wyzwania', desc: 'Szersze przepaście, filary i strome zjazdy.' },
-    { name: 'Ciężki transport', desc: 'Ciężarówki i cysterny. Każda złotówka i każda belka się liczy.' },
+    { name: 'Podstawy', count: 10, desc: 'Pierwsze przeprawy. Naucz się, że trójkąt to najlepszy przyjaciel inżyniera.' },
+    { name: 'Wyzwania', count: 10, desc: 'Szersze przepaście, filary i strome zjazdy.' },
+    { name: 'Ciężki transport', count: 10, desc: 'Ciężarówki i cysterny. Każda złotówka i każda belka się liczy.' },
+    { name: 'Mistrz inżynierii', count: 15, desc: 'Konwoje kilku pojazdów, wysokie wieże i najdłuższe mosty w grze.' },
   ];
 
   const SPECS = [
@@ -84,8 +86,51 @@
     { name: 'Wielki kanion', gap: 26, pillars: [{ x: 6, top: 5 }, { x: 16, top: 5 }], vehicle: 'tanker',
       hint: 'Trzy przęsła, najcięższy ładunek.' },
     { name: 'Most stulecia', gap: 30, yL: 12, yR: 12, pillars: [{ x: 6, top: 4 }, { x: 14, top: 4 }, { x: 22, top: 4 }], wallL: [4], wallR: [4], vehicle: 'tanker',
-      hint: 'Ostatnie wyzwanie. Pokaż wszystko, czego się nauczyłeś.' },
+      hint: 'Ostatnie wyzwanie rozdziału. Pokaż wszystko, czego się nauczyłeś.' },
+
+    // ---------- Rozdział 4: Mistrz inżynierii ----------
+    { name: 'Konwój aut', gap: 14, wallL: [3], wallR: [3], vehicles: ['car', 'car', 'car'],
+      hint: 'Trzy auta jadą jedno za drugim. Most musi unieść kilka pojazdów naraz.' },
+    { name: 'Rozpadlina', gap: 16, wallL: [2, 6], wallR: [2, 6], vehicle: 'van',
+      hint: 'Po dwie kotwy na każdej ścianie – wykorzystaj obie.' },
+    { name: 'Schody', gap: 14, yL: 14, yR: 9, wallL: [3], wallR: [3], pillars: [{ x: 6, top: 6 }], vehicle: 'truck',
+      hint: 'Duży spadek. Ciężarówka nie może zjechać zbyt gwałtownie.' },
+    { name: 'Pod prąd', gap: 16, yL: 9, yR: 13, pillars: [{ x: 8, top: 5 }], vehicle: 'van',
+      hint: 'Długi podjazd z podporą w środku.' },
+    { name: 'Trzy filary', gap: 26, pillars: [{ x: 6, top: 6 }, { x: 12, top: 6 }, { x: 18, top: 6 }], vehicle: 'car',
+      hint: 'Cztery krótkie przęsła zamiast jednego długiego.' },
+    { name: 'Dostawa hurtowa', gap: 18, wallL: [4], wallR: [4], vehicles: ['van', 'van'],
+      hint: 'Dwa dostawczaki naraz na długim przęśle.' },
+    { name: 'Bliźniacze wieże', gap: 22, pillars: [{ x: 6, top: 2 }, { x: 14, top: 2 }], vehicle: 'truck',
+      hint: 'Dwie wysokie wieże. Każde piętro wymaga przekątnych.' },
+    { name: 'Długie przęsło', gap: 18, wallL: [5], wallR: [5], vehicle: 'van',
+      hint: 'Żadnego filaru. Tylko kotwy nisko na ścianach.' },
+    { name: 'Wąska półka', gap: 20, wallL: [2], wallR: [2], pillars: [{ x: 10, top: 7 }], vehicle: 'truck',
+      hint: 'Kotwy tuż pod krawędzią i niski filar.' },
+    { name: 'Dwie cysterny', gap: 16, pillars: [{ x: 8, top: 6 }], vehicles: ['tanker', 'tanker'],
+      hint: 'Dwie najcięższe maszyny w grze, jedna za drugą.' },
+    { name: 'Kręty kanion', gap: 24, yL: 13, yR: 10, wallL: [3], wallR: [3], pillars: [{ x: 6, top: 5 }, { x: 16, top: 4 }], vehicle: 'truck',
+      hint: 'Filary na różnych wysokościach i opadająca jezdnia.' },
+    { name: 'Nad wodospadem', gap: 28, pillars: [{ x: 8, top: 3 }, { x: 18, top: 3 }], vehicle: 'van',
+      hint: 'Długie przęsła między głęboko posadowionymi filarami.' },
+    { name: 'Ciężki konwój', gap: 20, wallL: [4], wallR: [4], pillars: [{ x: 10, top: 6 }], vehicles: ['truck', 'tanker'],
+      hint: 'Ciężarówka i cysterna. Zaplanuj zapas wytrzymałości.' },
+    { name: 'Wysoki most', gap: 26, yL: 14, yR: 14, pillars: [{ x: 8, top: 3 }, { x: 16, top: 3 }], vehicle: 'tanker',
+      hint: 'Jezdnia wysoko nad wodą, a wieże sięgają 11 metrów.' },
+    { name: 'Most tysiąclecia', gap: 34, yL: 12, yR: 12, wallL: [4], wallR: [4], pillars: [{ x: 6, top: 4 }, { x: 14, top: 4 }, { x: 22, top: 4 }],
+      vehicles: ['tanker', 'truck', 'tanker'],
+      hint: 'Wielki finał: 34 metry i trzy ciężkie pojazdy.' },
   ];
+
+  // Numer rozdziału planszy na podstawie liczby plansz w kolejnych rozdziałach
+  function chapterOf(i, chapters) {
+    let end = 0;
+    for (let c = 0; c < chapters.length; c++) {
+      end += chapters[c].count;
+      if (i < end) return c;
+    }
+    return chapters.length - 1;
+  }
 
   // Lekko nieregularne ściany poniżej kotew, zależnie od numeru planszy
   const jitter = (i, k) => (((i * 37 + k * 17) % 7) - 3) / 10;
@@ -117,7 +162,7 @@
     const level = {
       name: spec.name,
       hint: spec.hint,
-      chapter: Math.floor(i / opts.chapterSize),
+      chapter: chapterOf(i, opts.chapters),
       view: { x0: 0, x1: xR + 8, y0: 0, y1: top },
       build: { x0: 1, x1: xR + 7, y0: 1, y1: top - 1 },
       terrain,
@@ -126,9 +171,10 @@
       start: { x: xL - 6, y: yL },
       finish: xR + 4,
       budget: spec.budget || budgets[i] || 99999,
-      vehicle: spec.vehicle || (spec.allies ? spec.allies[0] : 'car'),
+      vehicle: spec.vehicle || (spec.vehicles || spec.allies || ['car'])[0],
       spec,
     };
+    if (spec.vehicles) level.convoy = spec.vehicles.map(type => ({ type, team: 'civil' }));
     if (opts.military) {
       level.military = true;
       level.charges = spec.charges;
@@ -146,9 +192,11 @@
   // allies / enemies – kolejność pojazdów w kolumnie (jeep | apc | tank)
   // charges – liczba ładunków wybuchowych do rozmieszczenia na belkach i linach
   const MIL_CHAPTERS = [
-    { name: 'Szkolenie saperów', desc: 'Zbuduj, przeprowadź swoich, wysadź. W tej kolejności.' },
-    { name: 'Linia frontu', desc: 'Dłuższe kolumny, mniej ładunków, cięższy sprzęt.' },
-    { name: 'Ofensywa', desc: 'Czołgi po obu stronach. Most musi je unieść – i runąć na rozkaz.' },
+    { name: 'Szkolenie saperów', count: 5, desc: 'Zbuduj, przeprowadź swoich, wysadź. W tej kolejności.' },
+    { name: 'Linia frontu', count: 5, desc: 'Dłuższe kolumny, mniej ładunków, cięższy sprzęt.' },
+    { name: 'Ofensywa', count: 5, desc: 'Czołgi po obu stronach. Most musi je unieść – i runąć na rozkaz.' },
+    { name: 'Kampania górska', count: 15, desc: 'Uskoki, głębokie filary i wrogie pościgi w górach.' },
+    { name: 'Ostatnia ofensywa', count: 15, desc: 'Najdłuższe kolumny i najdłuższe mosty. Jeden błąd i wróg przejdzie.' },
   ];
 
   const MIL_SPECS = [
@@ -186,11 +234,78 @@
     { name: 'Kanion', gap: 20, pillars: [{ x: 6, top: 5 }, { x: 12, top: 5 }], allies: ['tank', 'tank'], enemies: ['tank'], charges: 3,
       hint: 'Dwa czołgi muszą przejechać, wrogi czołg – nie.' },
     { name: 'Ostatni most', gap: 24, pillars: [{ x: 6, top: 5 }, { x: 16, top: 5 }], wallL: [4], wallR: [4], allies: ['apc', 'tank', 'apc'], enemies: ['tank', 'apc'], charges: 3,
-      hint: 'Ostatnia misja. Zbuduj, przeprowadź, wysadź.' },
+      hint: 'Ostatnia misja rozdziału. Zbuduj, przeprowadź, wysadź.' },
+
+    // ---------- Rozdział 4: Kampania górska ----------
+    { name: 'Zwiad', gap: 10, wallL: [3], wallR: [3], allies: ['jeep'], enemies: ['jeep', 'jeep', 'jeep'], charges: 1,
+      hint: 'Trzy wrogie łaziki. Jeden ładunek musi zatrzymać wszystkie.' },
+    { name: 'Konwój zaopatrzenia', gap: 12, wallL: [4], wallR: [4], allies: ['apc', 'apc', 'apc'], enemies: ['jeep'], charges: 2,
+      hint: 'Trzy transportery z zaopatrzeniem – wszystkie muszą przejechać.' },
+    { name: 'Rozpadlina', gap: 14, wallL: [2, 6], wallR: [2, 6], allies: ['jeep', 'apc'], enemies: ['apc'], charges: 1,
+      hint: 'Dwie kotwy na każdej ścianie dają wiele możliwości.' },
+    { name: 'Uskok II', gap: 12, yL: 13, yR: 10, wallL: [3], wallR: [3], allies: ['apc', 'jeep'], enemies: ['jeep', 'jeep'], charges: 2,
+      hint: 'Kolumna zjeżdża w dół. Wróg jest szybki.' },
+    { name: 'Pod górę', gap: 12, yL: 9, yR: 12, wallL: [3], wallR: [4], allies: ['apc'], enemies: ['apc'], charges: 1,
+      hint: 'Podjazd pod górę i tylko jeden ładunek.' },
+    { name: 'Filar strażniczy', gap: 16, pillars: [{ x: 8, top: 6 }], allies: ['jeep', 'jeep', 'apc'], enemies: ['apc', 'jeep'], charges: 2,
+      hint: 'Filar pośrodku. Zawalenie jednego przęsła wystarczy.' },
+    { name: 'Głęboki filar', gap: 16, yL: 11, pillars: [{ x: 6, top: 3 }], allies: ['apc', 'apc'], enemies: ['tank'], charges: 2,
+      hint: 'Wrogi czołg. Wieża na filarze to dobry cel.' },
+    { name: 'Ciężka przeprawa', gap: 12, wallL: [4], wallR: [4], allies: ['tank', 'tank'], enemies: ['apc'], charges: 2,
+      hint: 'Dwa czołgi jeden po drugim.' },
+    { name: 'Dwa przęsła', gap: 18, wallL: [3], wallR: [3], pillars: [{ x: 8, top: 6 }], allies: ['tank', 'apc'], enemies: ['tank'], charges: 2,
+      hint: 'Czołg na czele kolumny i czołg w pościgu.' },
+    { name: 'Pościg II', gap: 14, wallL: [4], wallR: [4], allies: ['jeep', 'jeep', 'jeep'], enemies: ['jeep', 'jeep', 'jeep'], charges: 1,
+      hint: 'Sześć łazików i jeden ładunek. Licz do trzech.' },
+    { name: 'Przełęcz', gap: 20, yL: 12, yR: 10, wallL: [3], wallR: [3], pillars: [{ x: 10, top: 5 }], allies: ['apc', 'tank'], enemies: ['apc', 'apc'], charges: 2,
+      hint: 'Opadająca przełęcz z filarem pośrodku.' },
+    { name: 'Wąwóz czołgów', gap: 14, wallL: [5], wallR: [5], allies: ['tank'], enemies: ['tank', 'tank'], charges: 1,
+      hint: 'Dwa wrogie czołgi, jeden ładunek.' },
+    { name: 'Trzy filary', gap: 24, pillars: [{ x: 6, top: 6 }, { x: 12, top: 6 }, { x: 18, top: 6 }], allies: ['jeep', 'apc', 'apc'], enemies: ['apc'], charges: 3,
+      hint: 'Długi most na trzech filarach.' },
+    { name: 'Wysoka wieża II', gap: 18, yL: 12, wallL: [4], wallR: [4], pillars: [{ x: 8, top: 3 }], allies: ['apc', 'tank'], enemies: ['tank'], charges: 2,
+      hint: 'Dziewięciometrowa wieża. Wysadź jej podstawę.' },
+    { name: 'Przeprawa górska', gap: 22, yL: 12, yR: 12, wallL: [4], wallR: [4], pillars: [{ x: 6, top: 5 }, { x: 14, top: 5 }],
+      allies: ['tank', 'apc', 'tank'], enemies: ['tank', 'apc'], charges: 2,
+      hint: 'Finał kampanii górskiej. Ciężka kolumna i ciężki pościg.' },
+
+    // ---------- Rozdział 5: Ostatnia ofensywa ----------
+    { name: 'Długa kolumna', gap: 16, wallL: [3], wallR: [3], allies: ['jeep', 'apc', 'jeep', 'apc'], enemies: ['apc'], charges: 2,
+      hint: 'Cztery pojazdy. Detonuj dopiero po ostatnim.' },
+    { name: 'Jeden strzał', gap: 18, pillars: [{ x: 8, top: 6 }], allies: ['tank', 'tank'], enemies: ['tank'], charges: 1,
+      hint: 'Jeden ładunek na moście dla czołgów.' },
+    { name: 'Stromy zjazd', gap: 16, yL: 14, yR: 10, wallL: [4], wallR: [3], pillars: [{ x: 8, top: 5 }], allies: ['apc', 'tank'], enemies: ['apc', 'apc'], charges: 2,
+      hint: 'Czterometrowy spadek i ciężki czołg.' },
+    { name: 'Nad rzeką', gap: 20, wallL: [5], wallR: [5], pillars: [{ x: 10, top: 4 }], allies: ['tank', 'apc'], enemies: ['tank'], charges: 2,
+      hint: 'Niskie kotwy i filar w nurcie rzeki.' },
+    { name: 'Most na filarach', gap: 26, pillars: [{ x: 6, top: 5 }, { x: 12, top: 5 }, { x: 18, top: 5 }], allies: ['apc', 'apc', 'tank'], enemies: ['tank', 'tank'], charges: 3,
+      hint: 'Trzy filary i dwa wrogie czołgi.' },
+    { name: 'Kanion II', gap: 22, wallL: [2, 6], wallR: [2, 6], pillars: [{ x: 10, top: 6 }], allies: ['tank', 'tank'], enemies: ['apc', 'apc', 'apc'], charges: 2,
+      hint: 'Trzy wrogie transportery tuż za twoimi czołgami.' },
+    { name: 'Odwrót', gap: 18, yL: 10, yR: 12, wallL: [3], wallR: [4], pillars: [{ x: 8, top: 6 }], allies: ['jeep', 'apc', 'tank'], enemies: ['jeep', 'jeep'], charges: 2,
+      hint: 'Kolumna wycofuje się pod górę.' },
+    { name: 'Wysokie wieże', gap: 24, yL: 12, yR: 12, pillars: [{ x: 6, top: 2 }, { x: 16, top: 2 }], allies: ['apc', 'tank'], enemies: ['tank'], charges: 2,
+      hint: 'Dwie wysokie wieże. Wystarczy obalić jedną.' },
+    { name: 'Ciężki pościg', gap: 20, wallL: [4], wallR: [4], pillars: [{ x: 8, top: 6 }], allies: ['tank', 'tank', 'tank'], enemies: ['tank', 'tank'], charges: 2,
+      hint: 'Trzy czołgi przejeżdżają, dwa nie mogą.' },
+    { name: 'Przełom', gap: 28, wallL: [4], wallR: [4], pillars: [{ x: 6, top: 5 }, { x: 14, top: 5 }, { x: 20, top: 5 }], allies: ['apc', 'tank', 'apc'], enemies: ['tank', 'apc'], charges: 3,
+      hint: 'Długi most i trzy ładunki.' },
+    { name: 'Ostatnia kotwa', gap: 12, allies: ['tank'], enemies: ['tank', 'tank', 'tank'], charges: 1,
+      hint: 'Tylko kotwy na krawędziach i jeden ładunek na trzy czołgi.' },
+    { name: 'Wielka przeprawa', gap: 30, pillars: [{ x: 6, top: 4 }, { x: 14, top: 4 }, { x: 22, top: 4 }], allies: ['apc', 'tank', 'apc', 'tank'], enemies: ['tank'], charges: 3,
+      hint: 'Cztery pojazdy na trzydziestometrowym moście.' },
+    { name: 'Zjazd do doliny', gap: 24, yL: 14, yR: 10, wallL: [4], wallR: [3], pillars: [{ x: 8, top: 4 }, { x: 16, top: 4 }], allies: ['tank', 'apc'], enemies: ['tank', 'apc'], charges: 2,
+      hint: 'Długi zjazd przez dwa filary.' },
+    { name: 'Twierdza', gap: 32, yL: 12, yR: 12, wallL: [4], wallR: [4], pillars: [{ x: 6, top: 3 }, { x: 14, top: 3 }, { x: 22, top: 3 }],
+      allies: ['tank', 'tank', 'apc', 'apc'], enemies: ['tank', 'tank'], charges: 3,
+      hint: 'Ciężka kolumna i ciężki pościg nad szeroką doliną.' },
+    { name: 'Most zwycięstwa', gap: 34, yL: 12, yR: 12, wallL: [4], wallR: [4], pillars: [{ x: 6, top: 4 }, { x: 14, top: 4 }, { x: 22, top: 4 }, { x: 28, top: 4 }],
+      allies: ['jeep', 'apc', 'tank', 'apc', 'tank'], enemies: ['tank', 'tank', 'apc'], charges: 3,
+      hint: 'Ostatnia misja. Pięć pojazdów musi przejść – trzy nie mogą.' },
   ];
 
-  global.LEVELS = SPECS.map((s, i) => build(s, i, { budgets: global.LEVEL_BUDGETS, chapterSize: 10 }));
+  global.LEVELS = SPECS.map((s, i) => build(s, i, { budgets: global.LEVEL_BUDGETS, chapters: CHAPTERS }));
   global.CHAPTERS = CHAPTERS;
-  global.MIL_LEVELS = MIL_SPECS.map((s, i) => build(s, i, { budgets: global.MIL_BUDGETS, chapterSize: 5, military: true }));
+  global.MIL_LEVELS = MIL_SPECS.map((s, i) => build(s, i, { budgets: global.MIL_BUDGETS, chapters: MIL_CHAPTERS, military: true }));
   global.MIL_CHAPTERS = MIL_CHAPTERS;
 })(typeof window !== 'undefined' ? window : globalThis);

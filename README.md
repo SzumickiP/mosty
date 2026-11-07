@@ -41,10 +41,12 @@ przechodzi automatycznie na pierwszego utworzonego gracza.
 
 Na ekranie startowym wybiera się wersję. Każda ma osobne plansze i zapis postępów.
 
-**Cywilna** – 30 plansz w trzech rozdziałach: **Podstawy**, **Wyzwania** i **Ciężki transport**.
-Pojazdy: auto, dostawczak, ciężarówka i cysterna.
+**Cywilna** – 45 plansz w czterech rozdziałach: **Podstawy**, **Wyzwania**, **Ciężki transport**
+i **Mistrz inżynierii**. Pojazdy: auto, dostawczak, ciężarówka i cysterna. W ostatnim rozdziale
+pojawiają się konwoje – kilka pojazdów jadących po kolei, które wszystkie muszą dojechać do flagi.
 
-**Militarna** – 15 plansz w trzech rozdziałach: **Szkolenie saperów**, **Linia frontu** i **Ofensywa**.
+**Militarna** – 45 plansz w pięciu rozdziałach: **Szkolenie saperów**, **Linia frontu**, **Ofensywa**,
+**Kampania górska** i **Ostatnia ofensywa**.
 Most musi przenieść kolumnę sojuszników (łazik, transporter, czołg), a potem dać się wysadzić,
 zanim przejedzie wróg. Na każdej planszy jest inna liczba ładunków dynamitu; zakłada się je
 na belki i liny (nie na jezdnię). Misja jest zaliczona, gdy wszyscy sojusznicy dojadą do flagi,

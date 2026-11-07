@@ -307,11 +307,12 @@
     result() {
       const vs = this.vehicles;
       if (!this.level.military) {
-        const v = vs[0];
-        if (v.fell) return { win: false, msg: 'Pojazd wpadł do przepaści.' };
-        if (v.crossed) return { win: true };
-        if (v.stillTime > 3) return { win: false, msg: 'Pojazd utknął.' };
-        if (this.time > 60) return { win: false, msg: 'Skończył się czas.' };
+        // wszystkie pojazdy (jeden albo konwój) muszą dojechać do flagi
+        const lost = vs.find(v => v.fell);
+        if (lost) return { win: false, msg: vs.length > 1 ? `Pojazd z konwoju (${lost.spec.name.toLowerCase()}) wpadł do przepaści.` : 'Pojazd wpadł do przepaści.' };
+        if (vs.every(v => v.crossed)) return { win: true };
+        if (vs.some(v => !v.crossed && v.stillTime > 3)) return { win: false, msg: 'Pojazd utknął.' };
+        if (this.time > 60 + 20 * (vs.length - 1)) return { win: false, msg: 'Skończył się czas.' };
         return null;
       }
       const allies = vs.filter(v => v.team === 'ally');

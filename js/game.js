@@ -213,7 +213,7 @@
     onDesignChanged();
   }
   function onDesignChanged() {
-    store.set(ukey('design.' + S.li), S.beams);
+    store.set(designKey(S.li), S.beams);
     updateHud();
   }
 
@@ -225,17 +225,20 @@
     if (!military() && S.tool === 'charge') S.tool = 'road';
   }
 
+  const designKey = (i) => ukey((S.testMode ? 'test.design.' : 'design.') + i);
+
   function loadLevel(i) {
     S.li = i;
     S.level = LV()[i];
-    S.beams = store.get(ukey('design.' + i), []);
+    S.beams = store.get(designKey(i), []);
     if (!military()) S.beams.forEach(b => delete b.charge);
     S.history = [];
     S.pending = null;
     S.dragStart = null;
-    store.set(ukey('lastLevel'), i);
+    if (!S.testMode) store.set(ukey('lastLevel'), i);
     stopTest();
-    $('level-num').textContent = i + 1;
+    $('level-num').textContent = (S.testMode ? '🧪 ' : '') + (i + 1);
+    $('test-banner').classList.toggle('hidden', !S.testMode);
     $('level-name').textContent = S.level.name;
     $('budget-max').textContent = S.level.budget.toLocaleString('pl-PL');
     setHint();
@@ -259,7 +262,9 @@
           `<b>🧨 Dynamit</b> (${lv.charges}): kliknij belkę lub linę. W trakcie testu: <b>Detonuj</b> albo klawisz D.`;
       } else {
         $('hint').innerHTML =
-          `<b>Cel:</b> przeprowadź pojazd (${VEHICLES[lv.vehicle].name.toLowerCase()}) na drugą stronę, do flagi. ${lv.hint}<br>` +
+          (lv.spec.vehicles
+            ? `<b>Cel:</b> przeprowadź cały konwój (${vehicleList(lv.spec.vehicles)}) na drugą stronę, do flagi. ${lv.hint}<br>`
+            : `<b>Cel:</b> przeprowadź pojazd (${VEHICLES[lv.vehicle].name.toLowerCase()}) na drugą stronę, do flagi. ${lv.hint}<br>`) +
           `Kliknij węzeł lub <b>czerwoną kotwę</b>, potem punkt siatki. Prawy przycisk – anuluj / usuń.`;
       }
     } else if (!lv.military) {
@@ -333,11 +338,13 @@
     if (r.win) {
       const cost = totalCost();
       const st = stars(cost, S.level.budget);
-      const p = progress();
-      const best = p.best[S.li];
-      if (!best || cost < best.cost) p.best[S.li] = { cost, stars: st, date: Date.now() };
-      p.unlocked = Math.max(p.unlocked, Math.min(levels.length, S.li + 2));
-      saveProgress();
+      if (!S.testMode) {
+        const p = progress();
+        const best = p.best[S.li];
+        if (!best || cost < best.cost) p.best[S.li] = { cost, stars: st, date: Date.now() };
+        p.unlocked = Math.max(p.unlocked, Math.min(levels.length, S.li + 2));
+        saveProgress();
+      }
       const last = S.li === levels.length - 1;
       const costLine = `Koszt: <b>${cost.toLocaleString('pl-PL')} zł</b> z ${S.level.budget.toLocaleString('pl-PL')} zł.
         ${st < 3 ? `Trzy gwiazdki za koszt do ${Math.floor(S.level.budget * 0.7).toLocaleString('pl-PL')} zł.` : 'Wzorowa, oszczędna konstrukcja.'}`;
@@ -349,7 +356,8 @@
         : `<h2>Most wytrzymał!</h2>
            <div class="big-stars">${starsHtml(st)}</div>
            <p>${costLine}${sim.brokenCount ? `<br>Uwaga: pękło elementów: ${sim.brokenCount}.` : ''}</p>`;
-      showPanel('result', `${body}
+      const testNote = S.testMode ? '<p class="test-note">🧪 Tryb testowy – wynik nie został zapisany.</p>' : '';
+      showPanel('result', `${body}${testNote}
         <div class="actions">
           <button class="btn" data-act="build">Popraw most</button>
           <button class="btn" data-act="menu">Plansze</button>
@@ -464,6 +472,7 @@
   }
 
   function chooseUser(uid) {
+    S.testMode = false;
     setUser(uid);
     const saved = store.get(userPrefix(uid) + 'variant', 'civil');
     setVariant(saved === 'military' ? 'military' : 'civil');
@@ -557,7 +566,7 @@
         : 'budżet ' + lv.budget.toLocaleString('pl-PL') + ' zł';
       const sub = lv.military
         ? `${vehicleList(lv.spec.allies)} · 🧨 ${lv.charges}`
-        : VEHICLES[lv.vehicle].name;
+        : lv.spec.vehicles ? 'Konwój: ' + vehicleList(lv.spec.vehicles) : VEHICLES[lv.vehicle].name;
       return `<button class="level-card${i === S.li ? ' current' : ''}" data-level="${i}" ${locked ? 'disabled' : ''}>
         <div class="n">${i + 1}</div>
         <div class="t">${lv.name}</div>
@@ -590,6 +599,7 @@
   }
 
   function chooseVariant(id) {
+    if (S.testMode) { S.testMode = false; S.level = null; }
     const changed = id !== S.variant || !S.level;
     setVariant(id);
     if (changed) {
@@ -622,7 +632,7 @@
     }
     if ((el = t('[data-score-variant]'))) { showScores(el.dataset.scoreVariant); return; }
     const lvl = t('[data-level]');
-    if (lvl && !lvl.disabled) { hideOverlay(); loadLevel(+lvl.dataset.level); return; }
+    if (lvl && !lvl.disabled) { S.testMode = false; hideOverlay(); loadLevel(+lvl.dataset.level); return; }
     const act = t('[data-act]');
     if (!act) {
       if (e.target.id === 'overlay' && (S.panel === 'menu' || (S.panel === 'scores' && currentUser))) hideOverlay();
@@ -753,6 +763,7 @@
 
   window.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
+    if (cheatKey(e)) { e.preventDefault(); return; }
     if (S.panel === 'start' || S.panel === 'users' || S.panel === 'confirm') return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
     switch (e.key) {
@@ -770,6 +781,45 @@
       case 'm': case 'M': showMenu(); break;
     }
   });
+
+  // ---------- Ukryty tryb testowy ----------
+  // Wpisanie z klawiatury „testc12” albo „testm5” otwiera dowolną planszę (także zablokowaną)
+  // wersji cywilnej lub militarnej. Wyniki nie są zapisywane, a mosty mają osobny zapis.
+  let cheatBuf = '';
+  let cheatTimer = 0;
+  function cheatKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return false;
+    cheatBuf = (cheatBuf + e.key.toLowerCase()).slice(-12);
+    clearTimeout(cheatTimer);
+    const m = cheatBuf.match(/test([cm])(\d{1,2})$/);
+    if (m) {
+      // chwila na wpisanie drugiej cyfry
+      cheatTimer = setTimeout(() => { cheatBuf = ''; enterTestMode(m[1] === 'm' ? 'military' : 'civil', +m[2]); }, 700);
+      return true;
+    }
+    return /test[cm]$/.test(cheatBuf); // połknij „c” / „m”, żeby nie otworzyć menu
+  }
+
+  function enterTestMode(variant, n) {
+    const levels = VARIANTS[variant].levels;
+    if (n < 1 || n > levels.length) {
+      toast(`Wersja ${VARIANTS[variant].name.toLowerCase()} ma plansze 1–${levels.length}`);
+      return;
+    }
+    if (variant !== S.variant) setVariant(variant);
+    S.testMode = true;
+    hideOverlay();
+    loadLevel(n - 1);
+    toast(`🧪 Tryb testowy: plansza ${n} (wersja ${VARIANTS[variant].name.toLowerCase()})`, true);
+  }
+
+  function exitTestMode() {
+    if (!S.testMode) return;
+    S.testMode = false;
+    loadLevel(Math.min(progress().unlocked - 1, store.get(ukey('lastLevel'), 0)));
+    toast('Koniec trybu testowego', true);
+  }
+  $('btn-test-exit').addEventListener('click', exitTestMode);
 
   // ---------- Widok ----------
   function resize() {
@@ -1338,5 +1388,12 @@
   resize();
   loadLevel(Math.min(progress().unlocked - 1, store.get(ukey('lastLevel'), 0)));
   showStart();
+  // Link z kodem testowym, np. index.html#testm5 albo index.html?testc12
+  function testFromUrl() {
+    const m = (location.hash + location.search).toLowerCase().match(/test([cm])(\d{1,2})/);
+    if (m) enterTestMode(m[1] === 'm' ? 'military' : 'civil', +m[2]);
+  }
+  testFromUrl();
+  window.addEventListener('hashchange', testFromUrl);
   requestAnimationFrame(frame);
 })();
